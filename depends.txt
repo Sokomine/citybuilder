@@ -1,0 +1,4 @@
+handle_schematics
+default
+doors
+cottages
