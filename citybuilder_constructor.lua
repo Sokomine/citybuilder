@@ -22,11 +22,14 @@ citybuilder.blueprint_placed = function( pos, placer, itemstack )
 		return;
 	end
 
-	citybuilder.update( pos, placer, meta );
+	local formspec = citybuilder.update( pos, placer, meta, nil );
+	minetest.show_formspec( placer:get_player_name(), "citybuilder:build", "formspec" );
+	meta:set_string( "formspec", formspec );
 end
 
 
-citybuilder.update = function( pos, player, meta )
+-- returns the new formspec
+citybuilder.update = function( pos, player, meta, do_upgrade )
 	if( not( meta ) or not( pos ) or not( player )) then
 		return;
 	end
@@ -46,40 +49,72 @@ citybuilder.update = function( pos, player, meta )
 			{}, -- no replacements
 		        meta:get_string("rotate"),
 			build_chest.building[ building_name ].axis,
-			meta:get_string("mirror"),
+			nil, -- no mirror; meta:get_int("mirror"),
 			-- no_plotmarker, keep_ground, scaffolding_only, plotmarker_pos
 			1, false, true, pos );
 	end
+
+	local formspec = "size[8,1]"..
+			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
+			"button_exit[5.5,0.7;1,0.5;OK;Exit]";
 	if( error_msg ) then
-		minetest.show_formspec( placer:get_player_name(), "citybuilder:build",
-			"size[8,1]"..
-			"label[0,0.1;Error: "..tostring( error_msg ).."]"..
-			"button_exit[3.5,0.7;1,0.5;OK;OK]");
-		return;
+		return formspec..
+			"label[0,0.1;Error: "..tostring( error_msg ).."]";
 	end
 
 	local need_to_dig   = meta:get_int( "nodes_to_dig" );
 	local need_to_place = meta:get_int( "nodes_to_place" );
---[[
-	local inv = meta:get_inventory();
-	local need_to_place = 0;
-	if( not( inv:is_empty("needed"))) then
-		for i in 1,inv:get_size("needed") do
-			need_to_place = need_to_place + inv:get_stack("needed", i):get_count();
-		end
+
+	-- if the building is not yet finished
+	if( need_to_dig ~= 0 or need_to_place ~= 0 or not( build_chest.building[ building_name ].citybuilder)) then
+		return formspec..
+			"label[0,0.1;Status: Need to dig "..tostring( need_to_dig ).." and place "..tostring( need_to_place ).." nodes.]"..
+			"button_exit[2.5,0.7;2,0.5;update;Update status]";
 	end
---]]
-minetest.chat_send_player( player:get_player_name(), "Need to dig "..tostring( need_to_dig ).." and place "..tostring( need_to_place ).." nodes.");
-	local formspec = ""; -- TODO
-	formspec = formspec.."label[3,3;The building has been updated.]"; -- TODO
+
+	-- set the level of the (completed) building
+	meta:set_int( "citybuilder_level", build_chest.building[ building_name ].level );
+	meta:set_int( "complete", 1 );
+
+	if( build_chest.building[ building_name ].upgrade_to ) then
+		-- TODO
+		local upgrade_possible_to = build_chest.building[ building_name ].upgrade_to;
+		local descr = upgrade_possible_to;
+		if( upgrade_possible_to
+		  and build_chest.building[ citybuilder.mts_path..upgrade_possible_to ]
+		  and build_chest.building[ citybuilder.mts_path..upgrade_possible_to ].descr ) then
+			descr = build_chest.building[ citybuilder.mts_path..upgrade_possible_to ].descr;
+		end
+
+		if( not( do_upgrade )) then
+			return formspec..
+				"label[0,0.1;Info: Upgrade \""..descr.."\" (level "..
+					tostring( build_chest.building[ citybuilder.mts_path..upgrade_possible_to ].level )..") available.]"..
+				"button_exit[2.5,0.7;2,0.5;upgrade;Upgrade now]";
+		end
+
+		meta:set_string( 'building_name', citybuilder.mts_path..upgrade_possible_to );
+		-- call the function recursively once in order to update
+		return citybuilder.update( pos, player, meta, nil );
+	end
+	return formspec..
+		"label[0,0.1;Congratulations! The highest upgrade has been reached.]";
 end
 
 
 
 
 citybuilder.on_receive_fields = function(pos, formname, fields, player)
-   minetest.chat_send_player("You entered: "..minetest.serialize(fields));
+	if( not( pos ) or fields.OK) then
+		return;
+	end
+	local meta = minetest.get_meta( pos );
+	local formspec = citybuilder.update( pos, player, meta, fields.upgrade );
+	minetest.show_formspec( player:get_player_name(), "citybuilder:build", "formspec" );
+	meta:set_string( "formspec", formspec );
 end
+
+
 
 minetest.register_node("citybuilder:blueprint", {
 	description = "Blueprint for a house", -- TODO: there are diffrent types
