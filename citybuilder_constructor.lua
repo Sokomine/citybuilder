@@ -54,7 +54,8 @@ citybuilder.update = function( pos, player, meta, do_upgrade )
 			1, false, true, pos );
 	end
 
-	local formspec = "size[8,1]"..
+	local formspec = "size[8,7]"..
+			"list[current_name;needed;0,2;8,5;]"..
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
 			"button_exit[3.0,0.7;2.5,0.5;remove_indicators;Remove scaffolding]"..
 			"button_exit[6.0,0.7;1,0.5;OK;Exit]";
