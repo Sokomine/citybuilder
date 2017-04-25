@@ -22,14 +22,13 @@ citybuilder.blueprint_placed = function( pos, placer, itemstack )
 		return;
 	end
 
-	local formspec = citybuilder.update( pos, placer, meta, nil );
-	minetest.show_formspec( placer:get_player_name(), "citybuilder:build", "formspec" );
-	meta:set_string( "formspec", formspec );
+	local formspec = citybuilder.update( pos, placer, meta, nil, nil );
+	minetest.show_formspec( placer:get_player_name(), "citybuilder:build", formspec );
 end
 
 
 -- returns the new formspec
-citybuilder.update = function( pos, player, meta, do_upgrade )
+citybuilder.update = function( pos, player, meta, do_upgrade, no_update )
 	if( not( meta ) or not( pos ) or not( player )) then
 		return;
 	end
@@ -37,6 +36,8 @@ citybuilder.update = function( pos, player, meta, do_upgrade )
 	local error_msg = nil;
 	if( not( building_name ) or building_name == "" or not( build_chest.building[ building_name ] )) then
 		error_msg = "Unkown building \""..tostring( building_name ).."\".";
+	elseif( no_update ) then
+		-- do nothing here
 	else
 		-- the place_building_from_file function will set these values
 		meta:set_int( "nodes_to_dig", -1 );
@@ -55,7 +56,7 @@ citybuilder.update = function( pos, player, meta, do_upgrade )
 	end
 
 	local formspec = "size[8,7]"..
-			"list[current_name;needed;0,2;8,5;]"..
+			"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";needed;0,2;8,5;]"..
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
 			"button_exit[3.0,0.7;2.5,0.5;remove_indicators;Remove scaffolding]"..
 			"button_exit[6.0,0.7;1,0.5;OK;Exit]";
@@ -97,7 +98,7 @@ citybuilder.update = function( pos, player, meta, do_upgrade )
 
 		meta:set_string( 'building_name', citybuilder.mts_path..upgrade_possible_to );
 		-- call the function recursively once in order to update
-		return citybuilder.update( pos, player, meta, nil );
+		return citybuilder.update( pos, player, meta, nil, nil );
 	end
 	return formspec..
 		"label[0,0.1;Congratulations! The highest upgrade has been reached.]";
@@ -116,9 +117,8 @@ citybuilder.on_receive_fields = function(pos, formname, fields, player)
 		handle_schematics.abort_project_remove_indicators( meta );
 		return;
 	end
-	local formspec = citybuilder.update( pos, player, meta, fields.upgrade );
-	minetest.show_formspec( player:get_player_name(), "citybuilder:build", "formspec" );
-	meta:set_string( "formspec", formspec );
+	local formspec = citybuilder.update( pos, player, meta, fields.upgrade, not(fields.update) );
+	minetest.show_formspec( player:get_player_name(), "citybuilder:build", formspec );
 end
 
 
@@ -173,12 +173,14 @@ minetest.register_node("citybuilder:blueprint", {
 		-- TODO: only allow aborting a project if level 0 has not been completed yet
 		-- TODO: unregister the building with the townhall
 		handle_schematics.abort_project_remove_indicators( meta );
---            if( building_name ~= nil and building_name ~= "" ) then
---               minetest.chat_send_player(name, "This building chest has been assigned to a building project. You can't take it away now.");
---               return false;
---            end
-            return true;
+		return true;
         end,
+
+	-- handle formspec manually - not via meta:set_string("formspec") as it is very dynamic
+	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
+		citybuilder.on_receive_fields(pos, "citybuilder:build", {}, clicker );
+		return itemstack;
+	end,
 })
 
 
