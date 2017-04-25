@@ -56,7 +56,8 @@ citybuilder.update = function( pos, player, meta, do_upgrade )
 
 	local formspec = "size[8,1]"..
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
-			"button_exit[5.5,0.7;1,0.5;OK;Exit]";
+			"button_exit[3.0,0.7;2.5,0.5;remove_indicators;Remove scaffolding]"..
+			"button_exit[6.0,0.7;1,0.5;OK;Exit]";
 	if( error_msg ) then
 		return formspec..
 			"label[0,0.1;Error: "..tostring( error_msg ).."]";
@@ -69,11 +70,11 @@ citybuilder.update = function( pos, player, meta, do_upgrade )
 	if( need_to_dig ~= 0 or need_to_place ~= 0 or not( build_chest.building[ building_name ].citybuilder)) then
 		return formspec..
 			"label[0,0.1;Status: Need to dig "..tostring( need_to_dig ).." and place "..tostring( need_to_place ).." nodes.]"..
-			"button_exit[2.5,0.7;2,0.5;update;Update status]";
+			"button_exit[0.5,0.7;2,0.5;update;Update status]";
 	end
 
 	-- set the level of the (completed) building
-	meta:set_int( "citybuilder_level", build_chest.building[ building_name ].level );
+	meta:set_int( "citybuilder_level", build_chest.building[ building_name ].level+1 );
 	meta:set_int( "complete", 1 );
 
 	if( build_chest.building[ building_name ].upgrade_to ) then
@@ -90,7 +91,7 @@ citybuilder.update = function( pos, player, meta, do_upgrade )
 			return formspec..
 				"label[0,0.1;Info: Upgrade \""..descr.."\" (level "..
 					tostring( build_chest.building[ citybuilder.mts_path..upgrade_possible_to ].level )..") available.]"..
-				"button_exit[2.5,0.7;2,0.5;upgrade;Upgrade now]";
+				"button_exit[0.5,0.7;2,0.5;upgrade;Upgrade now]";
 		end
 
 		meta:set_string( 'building_name', citybuilder.mts_path..upgrade_possible_to );
@@ -109,6 +110,11 @@ citybuilder.on_receive_fields = function(pos, formname, fields, player)
 		return;
 	end
 	local meta = minetest.get_meta( pos );
+
+	if( fields.remove_indicators ) then
+		handle_schematics.abort_project_remove_indicators( meta );
+		return;
+	end
 	local formspec = citybuilder.update( pos, player, meta, fields.upgrade );
 	minetest.show_formspec( player:get_player_name(), "citybuilder:build", "formspec" );
 	meta:set_string( "formspec", formspec );
@@ -155,6 +161,12 @@ minetest.register_node("citybuilder:blueprint", {
 		end
 		if( owner_name ~= name ) then
 			minetest.chat_send_player(name, "This building chest belongs to "..tostring( owner_name )..". You can't take it.");
+			return false;
+		end
+
+		local level = meta:get_int( "citybuilder_level" );
+		if( level and level > 0 ) then
+			minetest.chat_send_player(name, "This chest has spawned a building and cannot be digged.");
 			return false;
 		end
 		-- TODO: only allow aborting a project if level 0 has not been completed yet
