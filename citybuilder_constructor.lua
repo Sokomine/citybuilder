@@ -55,11 +55,12 @@ citybuilder.update = function( pos, player, meta, do_upgrade, no_update )
 			1, false, true, pos );
 	end
 
-	local formspec = "size[8,7]"..
+	local formspec = "size[9,7]"..
 			"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";needed;0,2;8,5;]"..
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
 			"button_exit[3.0,0.7;2.5,0.5;remove_indicators;Remove scaffolding]"..
-			"button_exit[6.0,0.7;1,0.5;OK;Exit]";
+			"button_exit[6.0,0.7;1.2,0.5;preview;Preview]"..
+			"button_exit[7.5,0.7;1,0.5;OK;Exit]";
 	if( error_msg ) then
 		return formspec..
 			"label[0,0.1;Error: "..tostring( error_msg ).."]";
@@ -117,7 +118,21 @@ citybuilder.on_receive_fields = function(pos, formname, fields, player)
 		handle_schematics.abort_project_remove_indicators( meta );
 		return;
 	end
-	local formspec = citybuilder.update( pos, player, meta, fields.upgrade, not(fields.update) );
+
+	local formspec = "";
+	if( fields.preview and not( fields.end_preview )) then
+		if( fields.preview == "Preview" ) then
+			fields.preview = "front";
+		end
+		local building_name = meta:get_string( 'building_name' );
+		formspec = "size[10,10]"..
+			"label[3,1;Preview]"..
+			"button[7,1;2.5,0.5;end_preview;Back to main menu]"..
+			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
+			build_chest.preview_image_formspec( building_name, {}, fields.preview);
+	else
+		formspec = citybuilder.update( pos, player, meta, fields.upgrade, not(fields.update) );
+	end
 	minetest.show_formspec( player:get_player_name(), "citybuilder:build", formspec );
 end
 
