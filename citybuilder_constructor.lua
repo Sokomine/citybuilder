@@ -73,7 +73,7 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
         if( not( data.building_name ) or data.building_name=="" or not( build_chest.building[ data.building_name ])) then
 		citybuilder.show_error_msg( placer,
 			"This building constructor has not been configured yet. "..
-			"Please configure it by using your town administration center.");
+			"Please configure it by using your city administration device.");
 		return;
 	end
 
@@ -218,9 +218,9 @@ end
 
 
 minetest.register_node("citybuilder:blueprint", {
-	description = "Blueprint for a house", -- TODO: there are diffrent types
+	description = "Blueprint for a house",
 	tiles = {"default_chest_side.png", "default_chest_top.png", "default_chest_side.png", -- TODO: a universal texture would be better
-		"default_chest_side.png", "default_chest_side.png", "default_chest_front.png"},
+		"default_chest_side.png", "default_chest_side.png", "default_chest_front.png^beds_bed.png"},
 	paramtype2 = "facedir",
 	groups = {snappy=2,choppy=2,oddly_breakable_by_hand=2},
 	legacy_facedir_simple = true,
@@ -237,14 +237,23 @@ minetest.register_node("citybuilder:blueprint", {
         end,
         allow_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, count, player)
                 if from_list=="needed" or to_list=="needed" then return 0 end
+		if( not( citybuilder.can_access_inventory( pos, player))) then
+			return false;
+		end
                 return count
         end,
         allow_metadata_inventory_put = function(pos, listname, index, stack, player)
                 if listname=="needed" then return 0 end
+		if( not( citybuilder.can_access_inventory( pos, player))) then
+			return false;
+		end
                 return stack:get_count()
         end,
         allow_metadata_inventory_take = function(pos, listname, index, stack, player)
                 if listname=="needed" then return 0 end
+		if( not( citybuilder.can_access_inventory( pos, player))) then
+			return false;
+		end
                 return stack:get_count()
         end,
 
