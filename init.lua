@@ -10,6 +10,9 @@ citybuilder.mts_path = citybuilder.modpath..'/schems/';
 -- load information about available buildings
 dofile(citybuilder.modpath.."/citybuilder_buildings.lua")
 
+-- helper functions and input handling
+dofile(citybuilder.modpath.."/citybuilder_misc.lua")
+
 -- the tool used to place, construct, repair and upgrade said buildings
 dofile(citybuilder.modpath.."/citybuilder_constructor.lua")
 

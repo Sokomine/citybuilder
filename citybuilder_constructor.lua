@@ -7,7 +7,7 @@
 -- oldmetadata we get in after_dig_node all the necessary information can be
 -- obtained and the player will get a citybuilder:blueprint that is set to the
 -- correct blueprint and has a nice description for mouseover
-citybuilder.blueprint_digged = function(pos, oldnode, oldmetadata, player)
+citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
 	-- TODO: unregister the building from the city data table
 
 	if( not(pos) or not(player)
@@ -59,15 +59,9 @@ citybuilder.blueprint_digged = function(pos, oldnode, oldmetadata, player)
 end
 
 
-citybuilder.show_error_msg = function( player, error_msg )
-	if( player and player:is_player()) then
-		minetest.chat_send_player( player:get_player_name(), error_msg );
-	end
-end
-
 
 -- called in after_place_node
-citybuilder.blueprint_placed = function( pos, placer, itemstack )
+citybuilder.constructor_placed = function( pos, placer, itemstack )
 	if( not( pos ) or not( placer ) or not( itemstack )) then
 		return;
 	end
@@ -108,13 +102,13 @@ citybuilder.blueprint_placed = function( pos, placer, itemstack )
 		return;
 	end
 
-	local formspec = citybuilder.update( pos, placer, meta, nil, nil );
-	minetest.show_formspec( placer:get_player_name(), "citybuilder:build", formspec );
+	local formspec = citybuilder.constructor_update( pos, placer, meta, nil, nil );
+	minetest.show_formspec( placer:get_player_name(), "citybuilder:constructor", formspec );
 end
 
 
 -- returns the new formspec
-citybuilder.update = function( pos, player, meta, do_upgrade, no_update )
+citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_update )
 	if( not( meta ) or not( pos ) or not( player )) then
 		return;
 	end
@@ -185,7 +179,7 @@ citybuilder.update = function( pos, player, meta, do_upgrade, no_update )
 
 		meta:set_string( 'building_name', citybuilder.mts_path..upgrade_possible_to );
 		-- call the function recursively once in order to update
-		return citybuilder.update( pos, player, meta, nil, nil );
+		return citybuilder.constructor_update( pos, player, meta, nil, nil );
 	end
 	return formspec..
 		"label[0,0.1;Congratulations! The highest upgrade has been reached.]";
@@ -194,7 +188,7 @@ end
 
 
 
-citybuilder.on_receive_fields = function(pos, formname, fields, player)
+citybuilder.constructor_on_receive_fields = function(pos, formname, fields, player)
 	if( not( pos ) or fields.OK) then
 		return;
 	end
@@ -217,9 +211,9 @@ citybuilder.on_receive_fields = function(pos, formname, fields, player)
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
 			build_chest.preview_image_formspec( building_name, {}, fields.preview);
 	else
-		formspec = citybuilder.update( pos, player, meta, fields.upgrade, not(fields.update) );
+		formspec = citybuilder.constructor_update( pos, player, meta, fields.upgrade, not(fields.update) );
 	end
-	minetest.show_formspec( player:get_player_name(), "citybuilder:build", formspec );
+	minetest.show_formspec( player:get_player_name(), "citybuilder:constructor", formspec );
 end
 
 
@@ -236,10 +230,10 @@ minetest.register_node("citybuilder:blueprint", {
 	drop = "citybuilder:blueprint_blank",
 
         after_place_node = function(pos, placer, itemstack)
-		citybuilder.blueprint_placed( pos, placer, itemstack );
+		citybuilder.constructor_placed( pos, placer, itemstack );
         end,
         on_receive_fields = function( pos, formname, fields, player )
-           return citybuilder.on_receive_fields(pos, formname, fields, player);
+           return citybuilder.constructor_on_receive_fields(pos, formname, fields, player);
         end,
         allow_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, count, player)
                 if from_list=="needed" or to_list=="needed" then return 0 end
@@ -282,26 +276,14 @@ minetest.register_node("citybuilder:blueprint", {
 
 	-- handle formspec manually - not via meta:set_string("formspec") as it is very dynamic
 	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
-		citybuilder.on_receive_fields(pos, "citybuilder:build", {}, clicker );
+		citybuilder.constructor_on_receive_fields(pos, "citybuilder:constructor", {}, clicker );
 		return itemstack;
 	end,
 
 	after_dig_node = function(pos, oldnode, oldmetadata, digger)
-		return citybuilder.blueprint_digged(pos, oldnode, oldmetadata, digger);
+		return citybuilder.constructor_digged(pos, oldnode, oldmetadata, digger);
 	end
 })
-
-
--- a player clicked on something in a formspec he was shown
-citybuilder.form_input_handler = function( player, formname, fields)
-	if(formname == "citybuilder:build" and fields and fields.pos2str) then
-		local pos = minetest.string_to_pos( fields.pos2str );
-		citybuilder.on_receive_fields(pos, formname, fields, player);
-	end
-end
-
--- make sure we receive player input; needed for showing formspecs directly (which is in turn faster than just updating the node)
-minetest.register_on_player_receive_fields( citybuilder.form_input_handler );
 
 
 -- helper item; blank blueprint constructors cannot be placed
