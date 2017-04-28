@@ -161,7 +161,14 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 	meta:set_int( "complete", 1 );
 
 	if( build_chest.building[ building_name ].upgrade_to ) then
-		-- TODO
+
+		-- only the owner/founder can do upgrades
+		if( not( citybuilder.can_access_inventory( pos, player))) then
+			return formspec..
+				"label[0,0.1;Only the founder of this city may upgrade buildings.]";
+		end
+
+		-- TODO: check if upgrade is allowed
 		local upgrade_possible_to = build_chest.building[ building_name ].upgrade_to;
 		local descr = upgrade_possible_to;
 		if( upgrade_possible_to
@@ -199,6 +206,7 @@ citybuilder.constructor_on_receive_fields = function(pos, formname, fields, play
 		return;
 	end
 
+	-- most functions are accessible to all players; only upgrades are limited to the owner
 	local formspec = "";
 	if( fields.preview and not( fields.end_preview )) then
 		if( fields.preview == "Preview" ) then
