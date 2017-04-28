@@ -3,22 +3,108 @@
 -- which the player selected
 
 
+-- when digging the player gets a citybuilder:blueprint_blank first; but from the
+-- oldmetadata we get in after_dig_node all the necessary information can be
+-- obtained and the player will get a citybuilder:blueprint that is set to the
+-- correct blueprint and has a nice description for mouseover
+citybuilder.blueprint_digged = function(pos, oldnode, oldmetadata, player)
+	-- TODO: unregister the building from the city data table
+
+	if( not(pos) or not(player)
+	  or not( oldmetadata ) or oldmetadata=="nil" or not(oldmetadata.fields)) then
+		return;
+	end
+
+	-- the digged blank blueprint will be replaced with a properly configured one if possible
+	local player_inv = player:get_inventory();
+	if( not( player_inv:contains_item("main", "citybuilder:blueprint_blank"))
+	  or not( player_inv:room_for_item( "main", "citybuilder:blueprint" ))) then
+		return;
+	end
+
+	-- the building has to be known
+	local building_name = oldmetadata.fields[ "building_name" ];
+	local building_data = build_chest.building[ building_name ];
+	if( not( building_name ) or not( building_data )) then
+		return;
+	end
+
+	-- configure the new item stack holding a configured blueprint
+	local item_stack = ItemStack("citybuilder:blueprint 1");
+	local stack_meta = item_stack:get_meta();
+	local data = stack_meta:to_table().fields;
+
+	-- fallback if no playername is set
+	if( not( oldmetadata.fields.owner ) or oldmetadata.fields.owner == "" ) then
+		oldmetadata.fields.owner = player:get_player_name();
+	end
+	data.building_name   = building_name;
+	data.owner           = oldmetadata.fields[ "owner" ];
+	data.city_center_pos = oldmetadata.fields[ "city_center_pos" ];
+	if( building_data.title and building_data.provides and building_data.size) then
+		data.description     = "\""..tostring(building_data.title)..
+					"\" (provides "..tostring( building_data.provides )..
+					") L "..tostring( building_data.size.x )..
+					" x W "..tostring(building_data.size.z)..
+					" x H "..tostring(building_data.size.y)..
+					" building constructor";
+	else
+		data.description     = "Building constructor for "..tostring( building_data.scm );
+	end
+	item_stack:get_meta():from_table({ fields = data });
+
+	-- remove the unconfigured blueprint which was the result of the digging action
+	player_inv:remove_item("main", "citybuilder:blueprint_blank 1");
+	player_inv:add_item("main", item_stack);
+end
+
+
+citybuilder.show_error_msg = function( player, error_msg )
+	if( player and player:is_player()) then
+		minetest.chat_send_player( player:get_player_name(), error_msg );
+	end
+end
+
+
 -- called in after_place_node
 citybuilder.blueprint_placed = function( pos, placer, itemstack )
- -- TODO: check if placement is allowed
-	local meta = minetest.get_meta( pos );
-	meta:set_string( 'owner',        placer:get_player_name());
+	if( not( pos ) or not( placer ) or not( itemstack )) then
+		return;
+	end
 
-	-- TODO: encode the filename somewhere (in the itemstacks metadata)
-	local building_name = citybuilder.mts_path.."npc_house_level_0_1_180";
-	meta:set_string( 'building_name', building_name );
+	-- get itemstack metadata
+	local item_meta = itemstack:get_meta();
+	local data = item_meta:to_table().fields;
+
+        if( not( data.building_name ) or data.building_name=="" or not( build_chest.building[ data.building_name ])) then
+		citybuilder.show_error_msg( placer,
+			"This building constructor has not been configured yet. "..
+			"Please configure it by using your town administration center.");
+		return;
+	end
+
+	if( data.owner ~= placer:get_player_name()) then
+		citybuilder.show_error_msg( placer,
+			"This building constructor belongs to "..tostring( data.owner )..". "..
+			"You can't use it. Craft your own one!");
+		return;
+	end
+
+-- TODO: also check city_center_pos
+-- TODO: check if placement is allowed
+	local meta = minetest.get_meta( pos );
+	meta:set_string( 'owner',           placer:get_player_name());
+	meta:set_string( 'building_name',   data.building_name );
+	meta:set_string( 'city_center_pos', data.city_center_pos );
+
 
 	-- this takes param2 of the node at the position pos into account (=rotation
 	-- of the chest/plot marker/...) and sets metadata accordingly: start_pos,
 	-- end_pos, rotate, mirror and replacements
 	local start_pos = build_chest.get_start_pos( pos );
 	if( not( start_pos ) or not( start_pos.x )) then
-		minetest.chat_send_player( placer:get_player_name(), "Error: "..tostring( start_pos ));
+		citybuilder.show_error_msg( placer,
+				"Error: "..tostring( start_pos ));
 		return;
 	end
 
@@ -137,7 +223,6 @@ citybuilder.on_receive_fields = function(pos, formname, fields, player)
 end
 
 
-
 minetest.register_node("citybuilder:blueprint", {
 	description = "Blueprint for a house", -- TODO: there are diffrent types
 	tiles = {"default_chest_side.png", "default_chest_top.png", "default_chest_side.png", -- TODO: a universal texture would be better
@@ -145,6 +230,10 @@ minetest.register_node("citybuilder:blueprint", {
 	paramtype2 = "facedir",
 	groups = {snappy=2,choppy=2,oddly_breakable_by_hand=2},
 	legacy_facedir_simple = true,
+	-- constructors are configured; stacking would not be a good idea
+	stack_max = 1,
+	-- when digging, return unconfigured blueprint; but: in after_dig_node it is exchanged for a configured one
+	drop = "citybuilder:blueprint_blank",
 
         after_place_node = function(pos, placer, itemstack)
 		citybuilder.blueprint_placed( pos, placer, itemstack );
@@ -175,7 +264,7 @@ minetest.register_node("citybuilder:blueprint", {
 		if( not( meta ) or not( owner_name )) then
 			return true;
 		end
-		if( owner_name ~= name ) then
+		if( owner_name ~= name and owner_name ~= "") then
 			minetest.chat_send_player(name, "This building chest belongs to "..tostring( owner_name )..". You can't take it.");
 			return false;
 		end
@@ -196,6 +285,10 @@ minetest.register_node("citybuilder:blueprint", {
 		citybuilder.on_receive_fields(pos, "citybuilder:build", {}, clicker );
 		return itemstack;
 	end,
+
+	after_dig_node = function(pos, oldnode, oldmetadata, digger)
+		return citybuilder.blueprint_digged(pos, oldnode, oldmetadata, digger);
+	end
 })
 
 
@@ -209,3 +302,20 @@ end
 
 -- make sure we receive player input; needed for showing formspecs directly (which is in turn faster than just updating the node)
 minetest.register_on_player_receive_fields( citybuilder.form_input_handler );
+
+
+-- helper item; blank blueprint constructors cannot be placed
+minetest.register_craftitem("citybuilder:blueprint_blank", {
+	description = "Blank blueprint constructor",
+	inventory_image = "default_paper.png^[transformFX",
+        groups = {},
+})
+
+minetest.register_craft({
+	output = "citybuilder:blueprint_blank",
+	recipe = {
+		{"default:paper", "default:paper", "default:paper"},
+		{"default:paper", "default:paper", "default:paper"},
+		{"", "default:chest", "default:sign_wall"}
+	}
+})
