@@ -77,6 +77,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			"button[2.5,1.5;1.5,0.5;proceed;Proceed]";
 
 
+	-- set the type of wood the city will use
 	elseif( not( wood ) or wood=="" or fields.change_wood or fields.change_wood_store) then
 
 		local inv = meta:get_inventory();
@@ -113,6 +114,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			"list[current_player;main;0,3.0;8,4;]";
 
 
+	-- add new buildings (by "printing" blueprints on citybuilder:blueprint_blank
 	elseif( fields.add_building or fields[ "citybuilder:cityadmin"] or fields.print_building) then
 		if( fields.print_building and fields.selected_blueprint) then
 			local inv = meta:get_inventory();
@@ -125,7 +127,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 				-- ..and add a properly configured one
 				local new_stack = citybuilder.constructor_get_configured_itemstack(
 					citybuilder.mts_path..citybuilder.starter_buildings[ tonumber(fields.selected_blueprint) ],
-					owner, pos, player );
+					owner, pos, wood, player );
 				-- put the configured constructor in the output field
 				output_stack:add_item( new_stack );
 				inv:set_stack( "printer_input",  1, input_stack );
@@ -181,10 +183,10 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 				"button[8,1;2.0,0.5;rename_city;Rename city]"..
 			"label[0.2,2.0;Wood type used:]"..
 				"item_image[3.5,1.75;1,1;"..wood.."]"..
-				"button[8,2;2.0,0.5;change_wood;Change wood]".. -- TODO: actually use the wooden replacements
+				"button[8,2;2.0,0.5;change_wood;Change wood]"..
 			"label[0.2,3.0;Number of buildings:]"..
 				"label[3.5,3.0;"..tostring( anz_buildings ).."]"..
-				"button[8,3;2.0,0.5;add_building;Add building]".. -- TODO
+				"button[8,3;2.0,0.5;add_building;Add building]"..
 			"label[0.2,4.0;Number of inhabitants:]"..
 				"label[3.5,4.0;"..tostring( anz_inhabitants ).."]"..
 				"button[8,4;2.0,0.5;info_inhabitants;Show details]".. -- TODO

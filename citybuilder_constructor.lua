@@ -5,7 +5,7 @@
 
 -- the citybuilder:blueprint node does hold metadata information;
 -- return a new stack with a configured constructor;
-citybuilder.constructor_get_configured_itemstack = function( building_name, owner, city_center_pos, player )
+citybuilder.constructor_get_configured_itemstack = function( building_name, owner, city_center_pos, wood, player )
 	-- the building has to be known
 	local building_name = building_name;
 	local building_data = build_chest.building[ building_name ];
@@ -25,6 +25,7 @@ citybuilder.constructor_get_configured_itemstack = function( building_name, owne
 	data.building_name   = building_name;
 	data.owner           = owner;
 	data.city_center_pos = city_center_pos;
+	data.wood            = wood;
 	if( building_data.title and building_data.provides and building_data.size) then
 		data.description     = "\""..tostring(building_data.title)..
 					"\" (provides "..tostring( building_data.provides )..
@@ -61,7 +62,7 @@ citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
 
 	-- get a configured itemstack with metadata
 	local item_stack = citybuilder.constructor_get_configured_itemstack(
-			oldmetadata.fields.building_name, oldmetadata.fields.owner, oldmetadata.fields.city_center_pos, player );
+			oldmetadata.fields.building_name, oldmetadata.fields.owner, oldmetadata.fields.city_center_pos, oldmetadata.fields.wood, player );
 	if( not( item_stack )) then
 		return;
 	end
@@ -103,6 +104,7 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 	meta:set_string( 'owner',           placer:get_player_name());
 	meta:set_string( 'building_name',   data.building_name );
 	meta:set_string( 'city_center_pos', data.city_center_pos );
+	meta:set_string( 'wood',            data.wood );
 
 
 	-- this takes param2 of the node at the position pos into account (=rotation
@@ -132,6 +134,18 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 	elseif( no_update ) then
 		-- do nothing here
 	else
+		-- apply wood replacements
+		local replacements = {};
+		local wood = meta:get_string("wood");
+		if( wood and wood ~= "" and replacements_group['wood'].data[ wood ] and wood ~= "default:wood") then
+			for i,v in ipairs( replacements_group['wood'].data[ "default:wood"] ) do
+				local new_node = replacements_group['wood'].data[ wood ][ i ];
+				if( v and new_node and minetest.registered_nodes[ v ] and minetest.registered_nodes[ new_node ]) then
+					table.insert( replacements, {v, new_node});
+				end
+			end
+		end
+
 		-- the place_building_from_file function will set these values
 		meta:set_int( "nodes_to_dig", -1 );
 		meta:set_int( "nodes_to_place", -1 );
@@ -140,7 +154,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 			minetest.deserialize(meta:get_string( "start_pos")),
 			minetest.deserialize(meta:get_string( "end_pos")),
 			building_name,
-			{}, -- no replacements
+			replacements,
 		        meta:get_string("rotate"),
 			build_chest.building[ building_name ].axis,
 			nil, -- no mirror; meta:get_int("mirror"),
