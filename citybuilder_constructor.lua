@@ -3,6 +3,43 @@
 -- which the player selected
 
 
+-- the citybuilder:blueprint node does hold metadata information;
+-- return a new stack with a configured constructor;
+citybuilder.constructor_get_configured_itemstack = function( building_name, owner, city_center_pos, player )
+	-- the building has to be known
+	local building_name = building_name;
+	local building_data = build_chest.building[ building_name ];
+	if( not( building_name ) or not( building_data )) then
+		return;
+	end
+
+	-- configure the new item stack holding a configured blueprint
+	local item_stack = ItemStack("citybuilder:blueprint 1");
+	local stack_meta = item_stack:get_meta();
+	local data = stack_meta:to_table().fields;
+
+	-- fallback if no playername is set
+	if( not( owner ) or owner == "" ) then
+		owner = player:get_player_name();
+	end
+	data.building_name   = building_name;
+	data.owner           = owner;
+	data.city_center_pos = city_center_pos;
+	if( building_data.title and building_data.provides and building_data.size) then
+		data.description     = "\""..tostring(building_data.title)..
+					"\" (provides "..tostring( building_data.provides )..
+					") L "..tostring( building_data.size.x )..
+					" x W "..tostring(building_data.size.z)..
+					" x H "..tostring(building_data.size.y)..
+					" building constructor";
+	else
+		data.description     = "Building constructor for "..tostring( building_data.scm );
+	end
+	item_stack:get_meta():from_table({ fields = data });
+	return item_stack;
+end
+
+
 -- when digging the player gets a citybuilder:blueprint_blank first; but from the
 -- oldmetadata we get in after_dig_node all the necessary information can be
 -- obtained and the player will get a citybuilder:blueprint that is set to the
@@ -22,36 +59,12 @@ citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
 		return;
 	end
 
-	-- the building has to be known
-	local building_name = oldmetadata.fields[ "building_name" ];
-	local building_data = build_chest.building[ building_name ];
-	if( not( building_name ) or not( building_data )) then
+	-- get a configured itemstack with metadata
+	local item_stack = citybuilder.constructor_get_configured_itemstack(
+			oldmetadata.fields.building_name, oldmetadata.fields.owner, oldmetadata.fields.city_center_pos, player );
+	if( not( item_stack )) then
 		return;
 	end
-
-	-- configure the new item stack holding a configured blueprint
-	local item_stack = ItemStack("citybuilder:blueprint 1");
-	local stack_meta = item_stack:get_meta();
-	local data = stack_meta:to_table().fields;
-
-	-- fallback if no playername is set
-	if( not( oldmetadata.fields.owner ) or oldmetadata.fields.owner == "" ) then
-		oldmetadata.fields.owner = player:get_player_name();
-	end
-	data.building_name   = building_name;
-	data.owner           = oldmetadata.fields[ "owner" ];
-	data.city_center_pos = oldmetadata.fields[ "city_center_pos" ];
-	if( building_data.title and building_data.provides and building_data.size) then
-		data.description     = "\""..tostring(building_data.title)..
-					"\" (provides "..tostring( building_data.provides )..
-					") L "..tostring( building_data.size.x )..
-					" x W "..tostring(building_data.size.z)..
-					" x H "..tostring(building_data.size.y)..
-					" building constructor";
-	else
-		data.description     = "Building constructor for "..tostring( building_data.scm );
-	end
-	item_stack:get_meta():from_table({ fields = data });
 
 	-- remove the unconfigured blueprint which was the result of the digging action
 	player_inv:remove_item("main", "citybuilder:blueprint_blank 1");
@@ -230,7 +243,7 @@ minetest.register_node("citybuilder:blueprint", {
 	tiles = {"default_chest_side.png", "default_chest_top.png", "default_chest_side.png", -- TODO: a universal texture would be better
 		"default_chest_side.png", "default_chest_side.png", "default_chest_front.png^beds_bed.png"},
 	paramtype2 = "facedir",
-	groups = {snappy=2,choppy=2,oddly_breakable_by_hand=2},
+	groups = {snappy=2,choppy=2,oddly_breakable_by_hand=2,not_in_creative_inventory=1},
 	legacy_facedir_simple = true,
 	-- constructors are configured; stacking would not be a good idea
 	stack_max = 1,

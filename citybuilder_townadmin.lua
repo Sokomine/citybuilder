@@ -113,7 +113,26 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			"list[current_player;main;0,3.0;8,4;]";
 
 
-	elseif( fields.add_building or fields[ "citybuilder:cityadmin"]) then
+	elseif( fields.add_building or fields[ "citybuilder:cityadmin"] or fields.print_building) then
+		if( fields.print_building and fields.selected_blueprint) then
+			local inv = meta:get_inventory();
+			local input_stack  = inv:get_stack("printer_input", 1 );
+			local output_stack = inv:get_stack("printer_output", 1 );
+			-- is there a blank blueprint available which we can configure?
+			if( output_stack:is_empty() and inv:contains_item("printer_input", "citybuilder:blueprint_blank")) then
+				-- take one blank blueprint..
+				input_stack:take_item(1);
+				-- ..and add a properly configured one
+				local new_stack = citybuilder.constructor_get_configured_itemstack(
+					citybuilder.mts_path..citybuilder.starter_buildings[ tonumber(fields.selected_blueprint) ],
+					owner, pos, player );
+				-- put the configured constructor in the output field
+				output_stack:add_item( new_stack );
+				inv:set_stack( "printer_input",  1, input_stack );
+				inv:set_stack( "printer_output", 1, output_stack );
+			end
+		end
+
 		formspec = "size[10,10]"..
 			pos_str..
 			"label[0.2,0.2;Please select the type of building you want to add:]"..
@@ -142,7 +161,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 		if( clicked and clicked.row and clicked.row > 0 and citybuilder.starter_buildings[ clicked.row ]) then
 			local building_data = build_chest.building[ citybuilder.mts_path..citybuilder.starter_buildings[ clicked.row ] ];
 			formspec = formspec..';'..tostring(clicked.row)..']'..
---TODO: store what was selected
+				"field[20,21;0.1,0.1;selected_blueprint;selected_blueprint_row;"..tostring(clicked.row).."]"..
 				"button[7.0,2.8;3.0,0.5;print_building;Print selected blueprint]"..
 				"label[7.0,5.0;Selected: "..tostring( building_data.title or "-unkown-").."]";
 		else
