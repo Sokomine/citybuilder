@@ -113,6 +113,43 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			"list[current_player;main;0,3.0;8,4;]";
 
 
+	elseif( fields.add_building or fields[ "citybuilder:cityadmin"]) then
+		formspec = "size[10,10]"..
+			pos_str..
+			"label[0.2,0.2;Please select the type of building you want to add:]"..
+			"list[current_player;main;0,6.0;8,4;]"..
+			"button[8.5,0.0;1.0,0.5;back;Back]"..
+				"label[7.8,1.0;Input:]"..
+				"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";printer_input;8.0,1.5;1,1;]"..
+				"item_image[9.0,1.5;1,1;citybuilder:blueprint_blank]"..
+				"label[7.8,3.5;Output:]"..
+				"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";printer_output;8.0,4.0;1,1;]"..
+				"item_image[9.0,4.0;1,1;citybuilder:blueprint]"..
+			"tablecolumns[" ..
+				"text,align=center;"..   -- description of building
+				"text,align=center]"..   -- what the building provides
+                        'table[0.2,0.8;6.0,5.0;'..formname..';';
+
+
+		for i,v in ipairs( citybuilder.starter_buildings ) do
+			local building_data = build_chest.building[ citybuilder.mts_path..v ];
+			formspec = formspec..
+					(building_data.title or building_data.scm or tostring(i))..","..
+					minetest.formspec_escape("["..(building_data.provides or "- unknown -").."]")..",";
+		end
+
+		local clicked = minetest.explode_table_event( fields[ "citybuilder:cityadmin"] );
+		if( clicked and clicked.row and clicked.row > 0 and citybuilder.starter_buildings[ clicked.row ]) then
+			local building_data = build_chest.building[ citybuilder.mts_path..citybuilder.starter_buildings[ clicked.row ] ];
+			formspec = formspec..';'..tostring(clicked.row)..']'..
+--TODO: store what was selected
+				"button[7.0,2.8;3.0,0.5;print_building;Print selected blueprint]"..
+				"label[7.0,5.0;Selected: "..tostring( building_data.title or "-unkown-").."]";
+		else
+			formspec = formspec..';]';
+		end
+
+
 	-- normal main menu
 	else
 		local anz_buildings = 0; -- TODO
@@ -125,7 +162,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 				"button[8,1;2.0,0.5;rename_city;Rename city]"..
 			"label[0.2,2.0;Wood type used:]"..
 				"item_image[3.5,1.75;1,1;"..wood.."]"..
-				"button[8,2;2.0,0.5;change_wood;Change wood]"..
+				"button[8,2;2.0,0.5;change_wood;Change wood]".. -- TODO: actually use the wooden replacements
 			"label[0.2,3.0;Number of buildings:]"..
 				"label[3.5,3.0;"..tostring( anz_buildings ).."]"..
 				"button[8,3;2.0,0.5;add_building;Add building]".. -- TODO
@@ -166,19 +203,25 @@ minetest.register_node("citybuilder:cityadmin", {
 
         allow_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, count, player)
 		if( not( citybuilder.can_access_inventory( pos, player))) then
-			return false;
+			return 0;
 		end
                 return count
         end,
         allow_metadata_inventory_put = function(pos, listname, index, stack, player)
 		if( not( citybuilder.can_access_inventory( pos, player))) then
-			return false;
+			return 0;
+		end
+		if( listname=="printer_output") then
+			return 0;
+		end
+		if( listname=="printer_input" and not( stack ) or stack:get_name()~="citybuilder:blueprint_blank") then
+			return 0;
 		end
                 return stack:get_count()
         end,
         allow_metadata_inventory_take = function(pos, listname, index, stack, player)
 		if( not( citybuilder.can_access_inventory( pos, player))) then
-			return false;
+			return 0;
 		end
                 return stack:get_count()
         end,
