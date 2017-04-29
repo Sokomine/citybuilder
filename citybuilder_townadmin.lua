@@ -44,18 +44,6 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 	if( owner ~= pname) then
 		formspec = formspec.."label[1,3;TODO: Show overview for other people than the founder.]"; -- TODO
 
-	-- the city needs a name
-	elseif( not( founded ) or founded == "" or not( city_name ) or city_name == "" or fields.change_name or fields.rename_city) then
-		if( not( city_name ) or city_name == "" ) then
-			city_name = owner.." City";
-		end
-		formspec = "size[6,2]"..
-			pos_str..
-			"label[0,0.0;How shall your settlement be called?]"..
-			"label[0,0.7;Name:]"..
-			"field[1.5,1;4,0.5;new_city_name;;"..city_name.."]"..
-			"button_exit[1.5,1.5;1.5,0.5;abort;Abort]"..
-			"button[3.5,1.5;1.5,0.5;set_city_name;Save]";
 
 	-- the player provided a city name
 	elseif( fields.set_city_name and fields.set_city_name ~= "" and fields.new_city_name and fields.new_city_name ~= "") then
@@ -75,6 +63,20 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			"label[0,0.0;Your settlement is now known as:]"..
 			"label[1.5,0.7;"..fields.new_city_name.."]"..
 			"button[2.5,1.5;1.5,0.5;proceed;Proceed]";
+
+
+	-- the city needs a name
+	elseif( not( founded ) or founded == "" or not( city_name ) or city_name == "" or fields.change_name or fields.rename_city) then
+		if( not( city_name ) or city_name == "" ) then
+			city_name = owner.." City";
+		end
+		formspec = "size[6,2]"..
+			pos_str..
+			"label[0,0.0;How shall your settlement be called?]"..
+			"label[0,0.7;Name:]"..
+			"field[1.5,1;4,0.5;new_city_name;;"..city_name.."]"..
+			"button_exit[1.5,1.5;1.5,0.5;abort;Abort]"..
+			"button[3.5,1.5;1.5,0.5;set_city_name;Save]";
 
 
 	-- set the type of wood the city will use
@@ -235,7 +237,7 @@ minetest.register_node("citybuilder:cityadmin", {
 		if( listname=="printer_output") then
 			return 0;
 		end
-		if( listname=="printer_input" and not( stack ) or stack:get_name()~="citybuilder:blueprint_blank") then
+		if( listname=="printer_input" and (not( stack ) or stack:get_name()~="citybuilder:blueprint_blank")) then
 			return 0;
 		end
                 return stack:get_count()
