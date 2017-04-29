@@ -38,7 +38,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 	local formspec = "size[10,10]"..
 			pos_str..
-			"label[3,1;City administration device]";
+			"label[3,1;City administration]";
 
 	-- most functions need to be limited to the founder of the city
 	if( owner ~= pname) then
@@ -200,12 +200,24 @@ end
 
 
 minetest.register_node("citybuilder:cityadmin", {
-	description = "City administration device",
-	tiles = {"default_chest_side.png", "default_chest_top.png", "default_chest_side.png", -- TODO: needs a better texture
+	description = "Desk of the city administrator",
+	tiles = {"default_chest_top.png^default_book_written.png", "default_chest_top.png", "default_chest_side.png", -- TODO: needs a better texture
 		"default_chest_side.png", "default_chest_side.png", "default_chest_front.png^default_tool_diamondshovel.png"},
 	paramtype2 = "facedir",
 	groups = {snappy=2,choppy=2,oddly_breakable_by_hand=2},
 	legacy_facedir_simple = true,
+
+	drawtype = "nodebox",
+	node_box = {
+		type = "fixed",
+		fixed = {
+			{-0.5,  0.5-2/16, -0.5, 0.5, 0.5, 0.5}, -- top of the desk
+			{-0.5+2/16, -0.5, -0.5, -0.5, 0.5, 0.5}, -- one side
+			{ 0.5-2/16, -0.5, -0.5, 0.5, 0.5, 0.5}, -- another side
+			{-0.5, 0.5-6/16, -0.5+2/16, 0.5, 0.5, -0.5}, -- front
+		},
+	},
+
 
 	after_place_node = function(pos, placer, itemstack)
 		local meta = minetest.get_meta(pos)

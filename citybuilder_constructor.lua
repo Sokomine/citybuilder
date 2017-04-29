@@ -87,7 +87,7 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
         if( not( data.building_name ) or data.building_name=="" or not( build_chest.building[ data.building_name ])) then
 		citybuilder.show_error_msg( placer,
 			"This building constructor has not been configured yet. "..
-			"Please configure it by using your city administration device.");
+			"Please configure it by using the desk of the city administrator.");
 		return;
 	end
 
@@ -256,6 +256,17 @@ minetest.register_node("citybuilder:blueprint", {
 	description = "Blueprint for a house",
 	tiles = {"default_chest_side.png", "default_chest_top.png", "default_chest_side.png", -- TODO: a universal texture would be better
 		"default_chest_side.png", "default_chest_side.png", "default_chest_front.png^beds_bed.png"},
+
+	drawtype = "nodebox",
+        node_box = {
+                type = "fixed",
+                fixed = {
+                        {-0.5, -0.5+3/16, 0.5-3/16, 0.5, 0.5, 0.5-1/16},
+                        {-0.5+1/16, -0.5,      0.5-1/16, -0.5+3/16, 0.5, 0.5     },
+                        { 0.5-3/16, -0.5,      0.5-1/16,  0.5-1/16, 0.5, 0.5     },
+                },
+        },
+
 	paramtype2 = "facedir",
 	groups = {snappy=2,choppy=2,oddly_breakable_by_hand=2,not_in_creative_inventory=1},
 	legacy_facedir_simple = true,
