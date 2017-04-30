@@ -1,55 +1,6 @@
 
-
--- only level 0 buildings are available at the beginning; all other buildings
--- can only be obtained through upgrades of said level 0 buildings
-citybuilder.starter_buildings = {};
-
-for i,v in ipairs( citybuilder.buildings ) do
-	-- this is a building that belongs to the citybuilder mod
-	v.citybuilder = 1;
-	-- register the building so that handle_schematics can analyze the blueprint and keep it ready
-	build_chest.add_building( citybuilder.mts_path..v.scm, v );
-	-- create preview images, statistics etc
-	build_chest.read_building( citybuilder.mts_path..v.scm, v );
-	-- add the building to the build chest
-	build_chest.add_entry( {'main','mods', 'citybuilder', v.provides, v.scm, citybuilder.mts_path..v.scm});
-	-- there has to be a first building in each series which does not require any predecessors;
-	-- it will be offered as something the player can build
-	-- (upgrades are then available at the particular building)
-	if( not( v.requires )) then
-		table.insert( citybuilder.starter_buildings, v.scm );
-	end	
-end
-
--- print("[citybuilder] Available starter buildings: "..minetest.serialize( citybuilder.starter_buildings ));
-
-
--- this table will contain information about all existing cities
-citybuilder.cities = {};
-
--- how shall the savefile be named?
-citybuilder.savefilename = "citybuilder.data"; -- TODO: move to config.lua
-
--- how many cities shall each player be able to have at max?
-citybuilder.max_cities_per_player = 5; -- TODO: move to config.lua
-
--- how far do two citybuilder blocks have to be apart at least?
-citybuilder.min_intercity_distance = 3; -- TODO: move to config.lua
-
-
--- restore saved data
-citybuilder.cities = save_restore.restore_data( citybuilder.savefilename );
-
-
--- save the datastructure
-citybuilder.save_data = function()
-	-- save datastructure
-	save_restore.save_data( citybuilder.savefilename, citybuilder.cities );
-end
-
-
 -- founding of a new city
-function citybuilder.start_city_at( pos, owner, city_name )
+citybuilder.cityadmin_start_city_at = function( pos, owner, city_name )
 	-- there can be only one city at a given location
 	local city_id = minetest.pos_to_string( pos );
 	if( citybuilder.cities[ city_id ] ) then
@@ -146,7 +97,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 		if( not( city_data )) then
 			-- check if the city can be founded here
-			local error_msg = citybuilder.start_city_at( pos, owner, fields.new_city_name );
+			local error_msg = citybuilder.cityadmin_start_city_at( pos, owner, fields.new_city_name );
 			if( error_msg ) then
 				minetest.show_formspec( "singleplayer", "citybuilder:cityadmin",
 					"size[8,2]"..
@@ -191,7 +142,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 	elseif( fields.confirm_abandon and fields.abandon_city_name and city_data and fields.abandon_city_name==city_data.city_name ) then
 
 		-- All inventory spaces (saplings, printer, ..) need to be empty
-		if( not( inv:is_empty("spalings")) or not( inv:is_empty( "printer_input" )) or not( inv:is_empty( "printer_output"))) then
+		if( not( inv:is_empty("saplings")) or not( inv:is_empty( "printer_input" )) or not( inv:is_empty( "printer_output"))) then
 			formspec = "size[5,2]"..
 				"label[0.5,0;Please remove all saplings and ]"..
 				"label[0.5,0.5;constructors/blueprints first!]"..
