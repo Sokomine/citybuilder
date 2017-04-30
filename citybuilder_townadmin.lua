@@ -35,6 +35,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 	local wood      = meta:get_string( "wood");
 	local pname     = player:get_player_name();
 	local pos_str   = "field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]";
+	local inv = meta:get_inventory();
 
 	local formspec = "size[10,10]"..
 			pos_str..
@@ -56,7 +57,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			fields.new_city_name = city_name;
 		end
 		meta:set_string( "city_name", fields.new_city_name );
-		meta:set_string( "infotext", fields.new_city_name.." (founded by "..tostring( owner )..")");
+		meta:set_string( "infotext", fields.new_city_name.." (founded by "..tostring( owner )..") city administrator desk");
 
 		formspec = "size[6,2]"..
 			pos_str..
@@ -79,10 +80,42 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			"button[3.5,1.5;1.5,0.5;set_city_name;Save]";
 
 
+	-- make the node diggable again by abandoning cities
+	elseif( fields.confirm_abandon and fields.abandon_city_name and fields.abandon_city_name==city_name ) then
+
+		-- TODO: also forbid abandoning of cities that have assigned buildings
+		if( not( inv:is_empty("spalings")) or not( inv:is_empty( "printer_input" )) or not( inv:is_empty( "printer_output"))) then
+			formspec = "size[5,2]"..
+				"label[1,0;Please remove all saplings and ]"..
+				"label[1,0.5;constructors/blueprints first!]"..
+				"button_exit[2.0,1.3;1.5,0.5;back;Back]";
+		else
+			-- TODO: actually unregister the city from the data structure
+			-- make the node diggable
+			meta:set_string( "founded",   nil);
+			meta:set_string( "city_name", nil);
+			meta:set_string("infotext", "Founding of a city by "..meta:get_string("owner").." (planned)");
+			-- return a formspec for confirmation
+			formspec = "size[6,2]"..
+				"label[0,0;City abandoned. You can now dig the city]"..
+				"label[0,0.5;administration desk and use it elsewhere.]"..
+				"button_exit[2.0,1.3;1.5,0.5;OK;OK]";
+		end
+
+	elseif( fields.abandon ) then
+		formspec = "size[8,2.5]"..
+			pos_str..
+			"label[0,0.0;Do you really want to abandon your city?]"..
+			"label[0,0.5;If so, please enter the name of your city below and confirm:]"..
+			"label[0,1.0;Name:]"..
+			"field[1.5,1.4;4,0.5;abandon_city_name;;]"..
+			"button[1.5,1.9;1.5,0.5;back;Abort]"..
+			"button[3.5,1.9;3.5,0.5;confirm_abandon;Confirm - really abandon]";
+
+
 	-- set the type of wood the city will use
 	elseif( not( wood ) or wood=="" or fields.change_wood or fields.change_wood_store) then
 
-		local inv = meta:get_inventory();
 		local stack = inv:get_stack("saplings", 1 );
 		if( stack and not( stack:is_empty()) and fields.change_wood_store) then
 			local sapling_name = stack:get_name();
@@ -119,7 +152,6 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 	-- add new buildings (by "printing" blueprints on citybuilder:blueprint_blank
 	elseif( fields.add_building or fields[ "citybuilder:cityadmin"] or fields.print_building) then
 		if( fields.print_building and fields.selected_blueprint) then
-			local inv = meta:get_inventory();
 			local input_stack  = inv:get_stack("printer_input", 1 );
 			local output_stack = inv:get_stack("printer_output", 1 );
 			-- is there a blank blueprint available which we can configure?
