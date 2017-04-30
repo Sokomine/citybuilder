@@ -23,6 +23,20 @@ end
 -- print("[citybuilder] Available starter buildings: "..minetest.serialize( citybuilder.starter_buildings ));
 
 
+citybuilder.cityadmin_get_main_menu_formspec = function( city_name, owner, wood, anz_buildings, anz_inhabitants)
+	return "label[3.5,0.2;City administration]"..
+			"label[0.2,1.0;Name of settlement:]"..
+				"label[3.5,1.0;"..city_name.."]"..
+				"label[3.5,1.3;founded by "..owner.."]"..
+			"label[0.2,2.0;Wood type used:]"..
+				"item_image[3.5,1.75;1,1;"..wood.."]"..
+			"label[0.2,3.0;Number of buildings:]"..
+				"label[3.5,3.0;"..tostring( anz_buildings ).."]"..
+			"label[0.2,4.0;Number of inhabitants:]"..
+				"label[3.5,4.0;"..tostring( anz_inhabitants ).."]";
+
+end
+
 
 citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, player)
 	if( not( pos ) or fields.OK or fields.abort) then
@@ -43,7 +57,10 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 	-- most functions need to be limited to the founder of the city
 	if( owner ~= pname) then
-		formspec = formspec.."label[1,3;TODO: Show overview for other people than the founder.]"; -- TODO
+		formspec = "size[8,6]"..
+			pos_str..
+			citybuilder.cityadmin_get_main_menu_formspec( city_name, owner, wood, 0, 0)..
+			"button_exit[3.5,5;1.0,0.5;abort;Exit]";
 
 
 	-- the player provided a city name
@@ -207,23 +224,13 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 	-- normal main menu
 	else
-		local anz_buildings = 0; -- TODO
-		local anz_inhabitants = 0; -- TODO
 		formspec = "size[10,6]"..
 			pos_str..
-			"label[3.5,0.2;City administration]"..
-			"label[0.2,1.0;Name of settlement:]"..
-				"label[3.5,1.0;"..city_name.."]"..
+			citybuilder.cityadmin_get_main_menu_formspec( city_name, owner, wood, 0, 0)..
 				"button[8,1;2.0,0.5;rename_city;Rename city]"..
-			"label[0.2,2.0;Wood type used:]"..
-				"item_image[3.5,1.75;1,1;"..wood.."]"..
 				"button[8,2;2.0,0.5;change_wood;Change wood]"..
-			"label[0.2,3.0;Number of buildings:]"..
-				"label[3.5,3.0;"..tostring( anz_buildings ).."]"..
 				"button[8,3;2.0,0.5;add_building;Add building]"..
-			"label[0.2,4.0;Number of inhabitants:]"..
-				"label[3.5,4.0;"..tostring( anz_inhabitants ).."]"..
-				"button[8,4;2.0,0.5;info_inhabitants;Show details]".. -- TODO
+				"button[8,4;2.0,0.5;info_inhabitants;Show details]"..
 			"button[0.2,5;2.5,0.5;abandon;Abandon settlement]"..
 			"button_exit[8.5,5;1.0,0.5;abort;Exit]";
 	end
