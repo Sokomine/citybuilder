@@ -1,4 +1,5 @@
 
+
 -- only level 0 buildings are available at the beginning; all other buildings
 -- can only be obtained through upgrades of said level 0 buildings
 citybuilder.starter_buildings = {};
@@ -23,17 +24,94 @@ end
 -- print("[citybuilder] Available starter buildings: "..minetest.serialize( citybuilder.starter_buildings ));
 
 
-citybuilder.cityadmin_get_main_menu_formspec = function( city_name, owner, wood, anz_buildings, anz_inhabitants)
+-- this table will contain information about all existing cities
+citybuilder.cities = {};
+
+-- how shall the savefile be named?
+citybuilder.savefilename = "citybuilder.data"; -- TODO: move to config.lua
+
+-- how many cities shall each player be able to have at max?
+citybuilder.max_cities_per_player = 5; -- TODO: move to config.lua
+
+-- how far do two citybuilder blocks have to be apart at least?
+citybuilder.min_intercity_distance = 3; -- TODO: move to config.lua
+
+
+-- restore saved data
+citybuilder.cities = save_restore.restore_data( citybuilder.savefilename );
+
+
+-- save the datastructure
+citybuilder.save_data = function()
+	-- save datastructure
+	save_restore.save_data( citybuilder.savefilename, citybuilder.cities );
+end
+
+
+-- founding of a new city
+function citybuilder.start_city_at( pos, owner, city_name )
+	-- there can be only one city at a given location
+	local city_id = minetest.pos_to_string( pos );
+	if( citybuilder.cities[ city_id ] ) then
+		return "There is already a sattlement registered at "..tostring(city_id)..".";
+	end
+
+	-- players cannot found an infinite number of cities
+	local anz = 1;
+	for k,v in pairs( citybuilder.cities ) do
+		if( v and v.owner and v.owner == owner) then
+			anz = anz+1;
+		end
+	end
+	if( anz > citybuilder.max_cities_per_player ) then
+		return "You can only have "..tostring( citybuilder.max_cities_per_player ).." cities.";
+	end
+
+	-- make sure cities do not overlap
+	local city_start_pos = { x=pos.x-citybuilder.min_intercity_distance, y=pos.y- 20, z=pos.z-citybuilder.min_intercity_distance };
+	local city_end_pos   = { x=pos.x+citybuilder.min_intercity_distance, y=pos.y+100, z=pos.z+citybuilder.min_intercity_distance };
+	for k,v in pairs( citybuilder.cities ) do
+		if( v and v.start_pos and v.end_pos
+		  and (math.abs( v.pos.x - pos.x )< 2*citybuilder.min_intercity_distance )
+		  and (math.abs( v.pos.z - pos.z )< 2*citybuilder.min_intercity_distance )
+		  and (math.abs( v.pos.y - pos.y )< 2*citybuilder.min_intercity_distance )) then
+			return "City area would overlap with city at "..tostring( k )..".";
+		end
+	end
+
+	-- register the new city
+	citybuilder.cities[ city_id ] = {
+			pos = pos,
+			start_pos = city_start_pos,
+			end_pos = city_end_pos,
+			owner = owner,
+			founded = os.time(),
+			city_name = city_name,
+			wood = "-unkown-",
+			buildings = {},
+			inhabitants = {} };
+	-- save it
+	citybuilder.save_data();
+	return;
+end
+
+
+
+citybuilder.cityadmin_get_main_menu_formspec = function( city_id )
+	local city_data = citybuilder.cities[ city_id ];
+	if( not( city_data )) then
+		return "label[0.5,0.2;Error: City has not been founded yet.]";
+	end
 	return "label[3.5,0.2;City administration]"..
 			"label[0.2,1.0;Name of settlement:]"..
-				"label[3.5,1.0;"..city_name.."]"..
-				"label[3.5,1.3;founded by "..owner.."]"..
+				"label[3.5,1.0;"..city_data.city_name.."]"..
+				"label[3.5,1.3;founded by "..city_data.owner.."]"..
 			"label[0.2,2.0;Wood type used:]"..
-				"item_image[3.5,1.75;1,1;"..wood.."]"..
+				"item_image[3.5,1.75;1,1;"..city_data.wood.."]"..
 			"label[0.2,3.0;Number of buildings:]"..
-				"label[3.5,3.0;"..tostring( anz_buildings ).."]"..
+				"label[3.5,3.0;"..table.getn( city_data.buildings ).."]"..
 			"label[0.2,4.0;Number of inhabitants:]"..
-				"label[3.5,4.0;"..tostring( anz_inhabitants ).."]";
+				"label[3.5,4.0;"..table.getn( city_data.inhabitants ).."]";
 
 end
 
@@ -43,12 +121,12 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 		return;
 	end
 	local meta = minetest.get_meta( pos );
+	-- these values are duplicated in the city datastructure
 	local owner     = meta:get_string( "owner" );
-	local founded   = meta:get_string( "founded");
-	local city_name = meta:get_string( "city_name" );
-	local wood      = meta:get_string( "wood");
 	local pname     = player:get_player_name();
-	local pos_str   = "field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]";
+	local city_id   = minetest.pos_to_string( pos );
+	local city_data = citybuilder.cities[ city_id ];
+	local pos_str   = "field[20,20;0.1,0.1;pos2str;Pos;"..city_id.."]";
 	local inv = meta:get_inventory();
 
 	local formspec = "size[10,10]"..
@@ -59,22 +137,31 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 	if( owner ~= pname) then
 		formspec = "size[8,6]"..
 			pos_str..
-			citybuilder.cityadmin_get_main_menu_formspec( city_name, owner, wood, 0, 0)..
+			citybuilder.cityadmin_get_main_menu_formspec( city_id )..
 			"button_exit[3.5,5;1.0,0.5;abort;Exit]";
 
 
 	-- the player provided a city name
 	elseif( fields.set_city_name and fields.set_city_name ~= "" and fields.new_city_name and fields.new_city_name ~= "") then
 
-		if( not( founded ) or founded=="" ) then
-			-- TODO: check if the city can be founded here
-			meta:set_string( "founded", os.time());
-		end
-		if( not( fields.new_city_name) or fields.new_city_name == "" ) then
-			fields.new_city_name = city_name;
+		if( not( city_data )) then
+			-- check if the city can be founded here
+			local error_msg = citybuilder.start_city_at( pos, owner, fields.new_city_name );
+			if( error_msg ) then
+				minetest.show_formspec( "singleplayer", "citybuilder:cityadmin",
+					"size[8,2]"..
+					"label[0,0.0;Founding of this city failed. Reason:]"..
+					"label[0.5,0.4;"..error_msg.."]"..
+					"button_exit[3.5,1.2;1,0.5;abort;Exit]");
+				return;
+			end
 		end
 		meta:set_string( "city_name", fields.new_city_name );
 		meta:set_string( "infotext", fields.new_city_name.." (founded by "..tostring( owner )..") city administrator desk");
+
+		-- store the new name in the citydatastructure
+		citybuilder.cities[ city_id ].city_name = fields.new_city_name;
+		citybuilder.save_data();
 
 		formspec = "size[6,2]"..
 			pos_str..
@@ -84,8 +171,11 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 
 	-- the city needs a name
-	elseif( not( founded ) or founded == "" or not( city_name ) or city_name == "" or fields.change_name or fields.rename_city) then
-		if( not( city_name ) or city_name == "" ) then
+	elseif( not( city_data ) or fields.rename_city) then
+		local city_name = "";
+		if( city_data and city_data.city_name ~= "") then
+			city_name = city_data.city_name;
+		else
 			city_name = owner.." City";
 		end
 		formspec = "size[6,2]"..
@@ -98,18 +188,30 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 
 	-- make the node diggable again by abandoning cities
-	elseif( fields.confirm_abandon and fields.abandon_city_name and fields.abandon_city_name==city_name ) then
+	elseif( fields.confirm_abandon and fields.abandon_city_name and city_data and fields.abandon_city_name==city_data.city_name ) then
 
-		-- TODO: also forbid abandoning of cities that have assigned buildings
+		-- All inventory spaces (saplings, printer, ..) need to be empty
 		if( not( inv:is_empty("spalings")) or not( inv:is_empty( "printer_input" )) or not( inv:is_empty( "printer_output"))) then
 			formspec = "size[5,2]"..
-				"label[1,0;Please remove all saplings and ]"..
-				"label[1,0.5;constructors/blueprints first!]"..
+				"label[0.5,0;Please remove all saplings and ]"..
+				"label[0.5,0.5;constructors/blueprints first!]"..
+				"button_exit[2.0,1.3;1.5,0.5;back;Back]";
+		-- forbid abandoning of cities that have assigned buildings
+		elseif( table.getn( city_data.buildings )>0) then
+			formspec = "size[5,2]"..
+				"label[0.5,0;Please remove all buildings that are]"..
+				"label[0.5,0.5;associated with this city first!]"..
+				"button_exit[2.0,1.3;1.5,0.5;back;Back]";
+		-- ..or those that have inhabitants
+		elseif( table.getn( city_data.inhabitants)>0) then
+			formspec = "size[5,2]"..
+				"label[0.5,0;The city still has some inhabitants.]"..
+				"label[0.5,0.5;Get rid of them first!]"..
 				"button_exit[2.0,1.3;1.5,0.5;back;Back]";
 		else
-			-- TODO: actually unregister the city from the data structure
-			-- make the node diggable
-			meta:set_string( "founded",   nil);
+			-- actually unregister the city from the data structure and make the node diggable
+			citybuilder.cities[ city_id ] = nil;
+			citybuilder.save_data();
 			meta:set_string( "city_name", nil);
 			meta:set_string("infotext", "Founding of a city by "..meta:get_string("owner").." (planned)");
 			-- return a formspec for confirmation
@@ -131,26 +233,25 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 
 	-- set the type of wood the city will use
-	elseif( not( wood ) or wood=="" or fields.change_wood or fields.change_wood_store) then
+	elseif( city_data and (city_data.wood == "" or not(minetest.registered_nodes[city_data.wood]) or fields.change_wood or fields.change_wood_store)) then
 
 		local stack = inv:get_stack("saplings", 1 );
 		if( stack and not( stack:is_empty()) and fields.change_wood_store) then
 			local sapling_name = stack:get_name();
 			for k,v in pairs( replacements_group['wood'].data ) do
-				if( v[6]==sapling_name and k ~= wood and stack:get_count()>=25) then
-					-- set the new wood type
-					wood = k;
+				if( v[6]==sapling_name and k ~= city_data.wood and stack:get_count()>=25) then
 					-- take the 25 saplings
 					inv:remove_item("saplings", stack:get_name().." 25");
-					-- store the new wood type
-					meta:set_string( "wood", wood );
+					-- set the new wood type and store it in the city data structure
+					citybuilder.cities[ city_id ].wood = k;
+					citybuilder.save_data();
 				end
 			end
 		end
 
 		local show_wood = "";
-		if( wood and minetest.registered_nodes[ wood ]) then
-			show_wood = "item_image[4.4,1.4;1,1;"..wood.."]"..
+		if( city_data.wood and minetest.registered_nodes[ city_data.wood ]) then
+			show_wood = "item_image[4.4,1.4;1,1;"..city_data.wood.."]"..
 				"button_exit[6.0,1.0;1.5,0.5;back;Back]";
 		end
 
@@ -178,7 +279,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 				-- ..and add a properly configured one
 				local new_stack = citybuilder.constructor_get_configured_itemstack(
 					citybuilder.mts_path..citybuilder.starter_buildings[ tonumber(fields.selected_blueprint) ],
-					owner, pos, wood, player );
+					city_data.owner, city_data.pos, city_data.wood, player );
 				-- put the configured constructor in the output field
 				output_stack:add_item( new_stack );
 				inv:set_stack( "printer_input",  1, input_stack );
@@ -226,7 +327,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 	else
 		formspec = "size[10,6]"..
 			pos_str..
-			citybuilder.cityadmin_get_main_menu_formspec( city_name, owner, wood, 0, 0)..
+			citybuilder.cityadmin_get_main_menu_formspec( city_id )..
 				"button[8,1;2.0,0.5;rename_city;Rename city]"..
 				"button[8,2;2.0,0.5;change_wood;Change wood]"..
 				"button[8,3;2.0,0.5;add_building;Add building]"..
@@ -305,7 +406,6 @@ minetest.register_node("citybuilder:cityadmin", {
 		local inv           = meta:get_inventory();
 		local owner_name    = meta:get_string( "owner" );
 		local name          = player:get_player_name();
-		local founded       = meta:get_string( "founded" );
 
 		if( not( meta ) or not( owner_name )) then
 			return true;
@@ -319,7 +419,7 @@ minetest.register_node("citybuilder:cityadmin", {
 		end
 
 		-- cities that have been founded cannot be destroyed by digging the node
-		if( founded and founded ~= "" ) then
+		if( citybuilder.cities[ minetest.pos_to_string( pos )]) then
 			minetest.chat_send_player(name,
 				"This city has been founded already. If you want to abandon it, please "..
 				"select the appropriate entry in the menu first.");
