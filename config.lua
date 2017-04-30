@@ -6,4 +6,4 @@ citybuilder.savefilename = "citybuilder.data";
 citybuilder.max_cities_per_player = 5;
 
 -- how far do two citybuilder blocks have to be apart at least?
-citybuilder.min_intercity_distance = 3;
+citybuilder.min_intercity_distance = 6;

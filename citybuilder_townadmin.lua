@@ -19,13 +19,13 @@ citybuilder.cityadmin_start_city_at = function( pos, owner, city_name )
 	end
 
 	-- make sure cities do not overlap
-	local city_start_pos = { x=pos.x-citybuilder.min_intercity_distance, y=pos.y- 20, z=pos.z-citybuilder.min_intercity_distance };
-	local city_end_pos   = { x=pos.x+citybuilder.min_intercity_distance, y=pos.y+100, z=pos.z+citybuilder.min_intercity_distance };
+	local city_start_pos = { x=pos.x-math.ceil(citybuilder.min_intercity_distance/2), y=pos.y- 20, z=pos.z-math.ceil(citybuilder.min_intercity_distance/2) };
+	local city_end_pos   = { x=pos.x+math.ceil(citybuilder.min_intercity_distance/2), y=pos.y+100, z=pos.z+math.ceil(citybuilder.min_intercity_distance/2) };
 	for k,v in pairs( citybuilder.cities ) do
 		if( v and v.start_pos and v.end_pos
-		  and (math.abs( v.pos.x - pos.x )< 2*citybuilder.min_intercity_distance )
-		  and (math.abs( v.pos.z - pos.z )< 2*citybuilder.min_intercity_distance )
-		  and (math.abs( v.pos.y - pos.y )< 2*citybuilder.min_intercity_distance )) then
+		  and (math.abs( v.pos.x - pos.x )< citybuilder.min_intercity_distance )
+		  and (math.abs( v.pos.z - pos.z )< citybuilder.min_intercity_distance )
+		  and (math.abs( v.pos.y - pos.y )< citybuilder.min_intercity_distance )) then
 			return "City area would overlap with city at "..tostring( k )..".";
 		end
 	end
@@ -230,7 +230,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 				-- ..and add a properly configured one
 				local new_stack = citybuilder.constructor_get_configured_itemstack(
 					citybuilder.mts_path..citybuilder.starter_buildings[ tonumber(fields.selected_blueprint) ],
-					city_data.owner, city_data.pos, city_data.wood, player );
+					city_data.owner, city_id, city_data.wood, player );
 				-- put the configured constructor in the output field
 				output_stack:add_item( new_stack );
 				inv:set_stack( "printer_input",  1, input_stack );

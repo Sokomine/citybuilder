@@ -98,8 +98,27 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 		return;
 	end
 
--- TODO: also check city_center_pos
--- TODO: check if placement is allowed
+	if( not( data.city_center_pos ) or not( citybuilder.cities[ data.city_center_pos ])) then
+		citybuilder.show_error_msg( placer,
+			"This constructor is configured for a (no longer?) existing city at "..
+			tostring( data.city_center_pos )..". It cannot be used anymore.");
+		return;
+	end
+
+	-- buildings have to be withhin a reasonable distance of the city administration desk
+	local city_center_pos = citybuilder.cities[ data.city_center_pos ].pos;
+	if( not( data.city_center_pos )
+	  or (math.abs( city_center_pos.x - pos.x )> math.floor(citybuilder.min_intercity_distance/2 ))
+	  or (math.abs( city_center_pos.y - pos.y )> math.floor(citybuilder.min_intercity_distance/2 ))
+	  or (math.abs( city_center_pos.z - pos.z )> math.floor(citybuilder.min_intercity_distance/2 ))) then
+		citybuilder.show_error_msg( placer,
+			"This location is too far away form the city center at "..
+			data.city_center_pos..
+			". Please place this constructor closer to your city administration desk.");
+		return;
+	end
+
+
 	local meta = minetest.get_meta( pos );
 	meta:set_string( 'owner',           placer:get_player_name());
 	meta:set_string( 'building_name',   data.building_name );
