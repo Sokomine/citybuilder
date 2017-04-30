@@ -163,6 +163,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 	end
 
 	local formspec = "size[9,7]"..
+			"label[0,1.5;Needed for completition (click on \"Update status\" to update):]"..
 			"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";needed;0,2;8,5;]"..
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
 			"button_exit[3.0,0.7;2.5,0.5;remove_indicators;Remove scaffolding]"..
