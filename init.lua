@@ -13,6 +13,9 @@ dofile(citybuilder.modpath.."/config.lua")
 -- load information about available buildings
 dofile(citybuilder.modpath.."/citybuilder_buildings.lua")
 
+-- some common functions for acessing and manipulating cities
+dofile(citybuilder.modpath.."/citybuilder_api.lua")
+
 -- helper functions and input handling
 dofile(citybuilder.modpath.."/citybuilder_misc.lua")
 

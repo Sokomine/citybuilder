@@ -47,7 +47,6 @@ citybuilder.cityadmin_start_city_at = function( pos, owner, city_name )
 end
 
 
-
 citybuilder.cityadmin_get_main_menu_formspec = function( city_id )
 	local city_data = citybuilder.cities[ city_id ];
 	if( not( city_data )) then
@@ -60,7 +59,8 @@ citybuilder.cityadmin_get_main_menu_formspec = function( city_id )
 			"label[0.2,2.0;Wood type used:]"..
 				"item_image[3.5,1.75;1,1;"..city_data.wood.."]"..
 			"label[0.2,3.0;Number of buildings:]"..
-				"label[3.5,3.0;"..table.getn( city_data.buildings ).."]"..
+				"label[3.5,3.0;"..citybuilder.city_get_anz_buildings( city_id ).."]"..
+				"button[4.0,3.0;2.5,0.5;show_buildings;Show buildings]"..
 			"label[0.2,4.0;Number of inhabitants:]"..
 				"label[3.5,4.0;"..table.getn( city_data.inhabitants ).."]";
 
@@ -99,7 +99,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			-- check if the city can be founded here
 			local error_msg = citybuilder.cityadmin_start_city_at( pos, owner, fields.new_city_name );
 			if( error_msg ) then
-				minetest.show_formspec( "singleplayer", "citybuilder:cityadmin",
+				minetest.show_formspec( pname, "citybuilder:cityadmin",
 					"size[8,2]"..
 					"label[0,0.0;Founding of this city failed. Reason:]"..
 					"label[0.5,0.4;"..error_msg.."]"..
@@ -148,7 +148,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 				"label[0.5,0.5;constructors/blueprints first!]"..
 				"button_exit[2.0,1.3;1.5,0.5;back;Back]";
 		-- forbid abandoning of cities that have assigned buildings
-		elseif( table.getn( city_data.buildings )>0) then
+		elseif( citybuilder.city_get_anz_buildings( city_id )>0) then
 			formspec = "size[5,2]"..
 				"label[0.5,0;Please remove all buildings that are]"..
 				"label[0.5,0.5;associated with this city first!]"..
@@ -216,6 +216,34 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			show_wood..
 			"button[6.0,2.0;1.5,0.5;change_wood_store;Save]"..
 			"list[current_player;main;0,3.0;8,4;]";
+
+
+	-- show a list of all buildings that belong to the city
+	elseif( fields.show_buildings ) then
+		formspec = "size[10,10]"..
+			pos_str..
+			"label[0.2,0.2;Buildings that belong to this settlement:]"..
+			"tablecolumns[" ..
+				"text,align=center;"..   -- title of the building
+				"text,align=center;"..   -- what the building provides
+				"text,align=center;"..   -- description of building
+				"text,align=center;"..   -- level of the building
+				"text,align=center]"..   -- position
+                        'table[0.2,0.8;9.0,8.0;form_does_not_exist;';
+
+		for k,v in pairs(city_data.buildings) do
+			local building_data = build_chest.building[ citybuilder.mts_path..v.building_name ];
+			if( building_data ) then
+				formspec = formspec..
+					minetest.formspec_escape(building_data.title or building_data.scm or tostring(i))..","..
+					minetest.formspec_escape("["..(building_data.provides or "- unknown -").."]")..","..
+					minetest.formspec_escape("\""..building_data.descr or "").."\","..
+					minetest.formspec_escape("[Level "..(building_data.level or "?").."]")..","..
+					minetest.formspec_escape(k)..",";
+			end
+		end
+		formspec = formspec..';]'..
+				"button[8.0,9.0;1.0,0.5;back;Back]";
 
 
 	-- add new buildings (by "printing" blueprints on citybuilder:blueprint_blank
@@ -286,7 +314,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			"button[0.2,5;2.5,0.5;abandon;Abandon settlement]"..
 			"button_exit[8.5,5;1.0,0.5;abort;Exit]";
 	end
-	minetest.show_formspec( "singleplayer", "citybuilder:cityadmin", formspec );
+	minetest.show_formspec( pname, "citybuilder:cityadmin", formspec );
 end
 
 

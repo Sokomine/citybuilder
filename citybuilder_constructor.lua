@@ -46,7 +46,11 @@ end
 -- obtained and the player will get a citybuilder:blueprint that is set to the
 -- correct blueprint and has a nice description for mouseover
 citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
-	-- TODO: unregister the building from the city data table
+	-- unregister the building from the city data table
+	if( oldmetadata and pos ) then
+		-- no matter which city did hold that building - it gets removed
+		citybuilder.city_delete_building( minetest.pos_to_string( pos ));
+	end
 
 	if( not(pos) or not(player)
 	  or not( oldmetadata ) or oldmetadata=="nil" or not(oldmetadata.fields)) then
@@ -73,7 +77,6 @@ citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
 end
 
 
-
 -- called in after_place_node
 citybuilder.constructor_placed = function( pos, placer, itemstack )
 	if( not( pos ) or not( placer ) or not( itemstack )) then
@@ -84,7 +87,7 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 	local item_meta = itemstack:get_meta();
 	local data = item_meta:to_table().fields;
 
-        if( not( data.building_name ) or data.building_name=="" or not( build_chest.building[ data.building_name ])) then
+        if( not( data ) or not( data.building_name ) or data.building_name=="" or not( build_chest.building[ data.building_name ])) then
 		citybuilder.show_error_msg( placer,
 			"This building constructor has not been configured yet. "..
 			"Please configure it by using the desk of the city administrator.");
@@ -104,13 +107,13 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 			tostring( data.city_center_pos )..". It cannot be used anymore.");
 		return;
 	end
+	local city_data = citybuilder.cities[ data.city_center_pos ];
 
 	-- buildings have to be withhin a reasonable distance of the city administration desk
 	local city_center_pos = citybuilder.cities[ data.city_center_pos ].pos;
-	if( not( data.city_center_pos )
-	  or (math.abs( city_center_pos.x - pos.x )> math.floor(citybuilder.min_intercity_distance/2 ))
-	  or (math.abs( city_center_pos.y - pos.y )> math.floor(citybuilder.min_intercity_distance/2 ))
-	  or (math.abs( city_center_pos.z - pos.z )> math.floor(citybuilder.min_intercity_distance/2 ))) then
+	if( not( city_data.start_pos )
+	  or not( city_data.end_pos )
+	  or not( citybuilder.pos_is_inside( pos, city_data.start_pos, city_data.end_pos ))) then
 		citybuilder.show_error_msg( placer,
 			"This location is too far away form the city center at "..
 			data.city_center_pos..
@@ -125,16 +128,50 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 	meta:set_string( 'city_center_pos', data.city_center_pos );
 	meta:set_string( 'wood',            data.wood );
 
-
 	-- this takes param2 of the node at the position pos into account (=rotation
 	-- of the chest/plot marker/...) and sets metadata accordingly: start_pos,
 	-- end_pos, rotate, mirror and replacements
 	local start_pos = build_chest.get_start_pos( pos );
 	if( not( start_pos ) or not( start_pos.x )) then
 		citybuilder.show_error_msg( placer,
-				"Error: "..tostring( start_pos ));
+			"Error: "..tostring( start_pos ));
 		return;
 	end
+
+
+	-- make sure there is no overlap with other buildings
+	local end_pos = minetest.deserialize( meta:get_string('end_pos'));
+	for i,v in ipairs( city_data.buildings) do
+		if( v and v.start_pos and v.end_pos
+		  -- no end corner of the new building can be inside that of the old one here
+		  and( citybuilder.pos_is_inside( {x=start_pos.x, y=start_pos.y, z=start_pos.z}, v.start_pos, v.end_pos )
+		    or citybuilder.pos_is_inside( {x=start_pos.x, y=start_pos.y, z=end_pos.z  }, v.start_pos, v.end_pos )
+		    or citybuilder.pos_is_inside( {x=start_pos.x, y=end_pos.y,   z=start_pos.z}, v.start_pos, v.end_pos )
+		    or citybuilder.pos_is_inside( {x=start_pos.x, y=end_pos.y,   z=end_pos.z  }, v.start_pos, v.end_pos )
+		    or citybuilder.pos_is_inside( {x=end_pos.x,   y=start_pos.y, z=start_pos.z}, v.start_pos, v.end_pos )
+		    or citybuilder.pos_is_inside( {x=end_pos.x,   y=start_pos.y, z=end_pos.z  }, v.start_pos, v.end_pos )
+		    or citybuilder.pos_is_inside( {x=end_pos.x,   y=end_pos.y,   z=start_pos.z}, v.start_pos, v.end_pos )
+		    or citybuilder.pos_is_inside( {x=end_pos.x,   y=end_pos.y,   z=end_pos.z  }, v.start_pos, v.end_pos )
+		  -- no end corner of the old building can be inside the volume of the new building
+		    or citybuilder.pos_is_inside( {x=v.start_pos.x, y=v.start_pos.y, z=v.start_pos.z}, start_pos, end_pos )
+		    or citybuilder.pos_is_inside( {x=v.start_pos.x, y=v.start_pos.y, z=v.end_pos.z  }, start_pos, end_pos )
+		    or citybuilder.pos_is_inside( {x=v.start_pos.x, y=v.end_pos.y,   z=v.start_pos.z}, start_pos, end_pos )
+		    or citybuilder.pos_is_inside( {x=v.start_pos.x, y=v.end_pos.y,   z=v.end_pos.z  }, start_pos, end_pos )
+		    or citybuilder.pos_is_inside( {x=v.end_pos.x,   y=v.start_pos.y, z=v.start_pos.z}, start_pos, end_pos )
+		    or citybuilder.pos_is_inside( {x=v.end_pos.x,   y=v.start_pos.y, z=v.end_pos.z  }, start_pos, end_pos )
+		    or citybuilder.pos_is_inside( {x=v.end_pos.x,   y=v.end_pos.y,   z=v.start_pos.z}, start_pos, end_pos )
+		    or citybuilder.pos_is_inside( {x=v.end_pos.x,   y=v.end_pos.y,   z=v.end_pos.z  }, start_pos, end_pos ))) then
+
+			citybuilder.show_error_msg( placer,
+				"Error: Overlapping with building project at "..minetest.pos_to_string( v.pos ));
+			return;
+		end
+	end
+
+	-- register the building in the citybuilder.cities data structure
+	citybuilder.city_add_building( data.city_center_pos,
+		{ pos = pos, start_pos = start_pos, end_pos = end_pos, building_name = data.building_name,
+		  rotate = meta:get_string("rotate"), mirror = meta:get_string("mirror") });
 
 	local formspec = citybuilder.constructor_update( pos, placer, meta, nil, nil );
 	minetest.show_formspec( placer:get_player_name(), "citybuilder:constructor", formspec );
@@ -344,7 +381,6 @@ minetest.register_node("citybuilder:blueprint", {
 			return false;
 		end
 		-- TODO: only allow aborting a project if level 0 has not been completed yet
-		-- TODO: unregister the building with the townhall
 		handle_schematics.abort_project_remove_indicators( meta );
 		return true;
         end,
