@@ -80,7 +80,7 @@ end
 -- called in after_place_node
 citybuilder.constructor_placed = function( pos, placer, itemstack )
 	if( not( pos ) or not( placer ) or not( itemstack )) then
-		return;
+		return false;
 	end
 
 	-- get itemstack metadata
@@ -91,21 +91,21 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 		citybuilder.show_error_msg( placer,
 			"This building constructor has not been configured yet. "..
 			"Please configure it by using the desk of the city administrator.");
-		return;
+		return false;
 	end
 
 	if( data.owner ~= placer:get_player_name()) then
 		citybuilder.show_error_msg( placer,
 			"This building constructor belongs to "..tostring( data.owner )..". "..
 			"You can't use it. Craft your own one!");
-		return;
+		return false;
 	end
 
 	if( not( data.city_center_pos ) or not( citybuilder.cities[ data.city_center_pos ])) then
 		citybuilder.show_error_msg( placer,
 			"This constructor is configured for a (no longer?) existing city at "..
 			tostring( data.city_center_pos )..". It cannot be used anymore.");
-		return;
+		return false;
 	end
 	local city_data = citybuilder.cities[ data.city_center_pos ];
 
@@ -118,7 +118,7 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 			"This location is too far away form the city center at "..
 			data.city_center_pos..
 			". Please place this constructor closer to your city administration desk.");
-		return;
+		return false;
 	end
 
 
@@ -135,13 +135,13 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 	if( not( start_pos ) or not( start_pos.x )) then
 		citybuilder.show_error_msg( placer,
 			"Error: "..tostring( start_pos ));
-		return;
+		return false;
 	end
 
 
 	-- make sure there is no overlap with other buildings
 	local end_pos = minetest.deserialize( meta:get_string('end_pos'));
-	for i,v in ipairs( city_data.buildings) do
+	for k,v in pairs( city_data.buildings) do
 		if( v and v.start_pos and v.end_pos
 		  -- no end corner of the new building can be inside that of the old one here
 		  and( citybuilder.pos_is_inside( {x=start_pos.x, y=start_pos.y, z=start_pos.z}, v.start_pos, v.end_pos )
@@ -164,7 +164,7 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 
 			citybuilder.show_error_msg( placer,
 				"Error: Overlapping with building project at "..minetest.pos_to_string( v.pos ));
-			return;
+			return false;
 		end
 	end
 
@@ -175,6 +175,7 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 
 	local formspec = citybuilder.constructor_update( pos, placer, meta, nil, nil );
 	minetest.show_formspec( placer:get_player_name(), "citybuilder:constructor", formspec );
+	return true;
 end
 
 
@@ -183,6 +184,12 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 	if( not( meta ) or not( pos ) or not( player )) then
 		return;
 	end
+	-- refuse update of constructors in ready-to-dig-mode
+	local level = meta:get_int( "citybuilder_level" );
+	if( level < -1 ) then
+		return;
+	end
+
 	local building_name = meta:get_string( 'building_name' );
 	local error_msg = nil;
 	if( not( building_name ) or building_name == "" or not( build_chest.building[ building_name ] )) then
@@ -205,6 +212,9 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 		-- the place_building_from_file function will set these values
 		meta:set_int( "nodes_to_dig", -1 );
 		meta:set_int( "nodes_to_place", -1 );
+		-- prepare the inventory
+		local inv = meta:get_inventory();
+		inv:set_size("needed", 8*5);
 		-- actually place dig_here-indicators and special scaffolding
 		error_msg = handle_schematics.place_building_from_file(
 			minetest.deserialize(meta:get_string( "start_pos")),
@@ -333,7 +343,11 @@ minetest.register_node("citybuilder:blueprint", {
 	drop = "citybuilder:blueprint_blank",
 
         after_place_node = function(pos, placer, itemstack)
-		citybuilder.constructor_placed( pos, placer, itemstack );
+		-- initialize and update the constructor; if that failes, make it diggable again
+		if( not( citybuilder.constructor_placed( pos, placer, itemstack ))) then
+			local meta = minetest.get_meta( pos );
+			meta:set_int( "citybuilder_level", -1 );
+		end
         end,
         on_receive_fields = function( pos, formname, fields, player )
            return citybuilder.constructor_on_receive_fields(pos, formname, fields, player);
@@ -371,13 +385,13 @@ minetest.register_node("citybuilder:blueprint", {
 			return true;
 		end
 		if( owner_name ~= name and owner_name ~= "") then
-			minetest.chat_send_player(name, "This building chest belongs to "..tostring( owner_name )..". You can't take it.");
+			minetest.chat_send_player(name, "This building constructor belongs to "..tostring( owner_name )..". You can't take it.");
 			return false;
 		end
 
 		local level = meta:get_int( "citybuilder_level" );
 		if( level and level > 0 ) then
-			minetest.chat_send_player(name, "This chest has spawned a building and cannot be digged.");
+			minetest.chat_send_player(name, "This building constructor has spawned a building and cannot be digged.");
 			return false;
 		end
 		-- TODO: only allow aborting a project if level 0 has not been completed yet
@@ -393,7 +407,7 @@ minetest.register_node("citybuilder:blueprint", {
 
 	after_dig_node = function(pos, oldnode, oldmetadata, digger)
 		return citybuilder.constructor_digged(pos, oldnode, oldmetadata, digger);
-	end
+	end,
 })
 
 
