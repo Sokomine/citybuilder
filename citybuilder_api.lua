@@ -42,6 +42,15 @@ citybuilder.city_get_anz_buildings = function( city_id )
 end
 
 
+citybuilder.city_get_building_at = function( pos )
+	local building_id = minetest.pos_to_string( pos );
+	for city_id,v in pairs( citybuilder.cities ) do
+		if( v.buildings[ building_id ] ) then
+			return citybuilder.cities[ city_id ].buildings[ building_id ];
+		end
+	end
+end
+
 -- helper function; returns true if pos is located inside the volume spanned by p1 and p2
 citybuilder.pos_is_inside = function( pos, p1, p2 )
 	return (pos.x >= math.min(p1.x,p2.x) and pos.x <= math.max(p1.x,p2.x)

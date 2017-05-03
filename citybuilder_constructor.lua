@@ -143,6 +143,33 @@ citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, m
 			tostring( data.city_center_pos )..". It cannot be used anymore.");
 		return itemstack;
 	end
+
+	-- the data structure might believe that there is a configured constructor here, but it might
+	-- have been removed by other means (WorldEdit etc.) in the meantime
+	local existing_building = citybuilder.city_get_building_at( pos );
+	if( existing_building) then
+		local meta = minetest.get_meta( pos );
+		-- place this node
+		minetest.set_node( pos, {name="citybuilder:constructor", param2=existing_building.param2});
+		-- set metadata according to what we have stored
+		meta:set_string( 'owner',           existing_building.owner);
+		meta:set_string( 'building_name',   citybuilder.mts_path..existing_building.building_name);
+		meta:set_string( 'city_center_pos', existing_building.city_center_pos );
+		meta:set_string( 'wood',            existing_building.wood );
+		meta:set_string( 'mirror',          existing_building.mirror );
+		meta:set_string( 'rotate',          existing_building.rotate );
+		meta:set_string( 'start_pos',       minetest.serialize(existing_building.start_pos ));
+		meta:set_string( 'end_pos',         minetest.serialize(existing_building.end_pos ));
+		-- tell the player
+		minetest.chat_send_player( pname, "The constructor here had gone missing. It has been replaced.");
+		-- show the formspec
+		local formspec = citybuilder.constructor_update( pos, placer, meta, nil, nil );
+		minetest.show_formspec( pname, "citybuilder:constructor", formspec );
+		-- do not consume this constructor as we are just replacing a missing one
+		return itemstack;
+	end
+
+
 	local city_data = citybuilder.cities[ data.city_center_pos ];
 
 	-- buildings have to be withhin a reasonable distance of the city administration desk
