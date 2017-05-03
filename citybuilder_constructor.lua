@@ -262,9 +262,26 @@ end
 
 
 
+-- helper function
+citybuilder.get_wood_replacements = function( wood, replacements )
+	if( not( wood ) or wood == "" or not( replacements_group['wood'].data[ wood ]) or wood == "default:wood") then
+		return replacements;
+	end
+	for i,v in ipairs( replacements_group['wood'].data[ "default:wood"] ) do
+		local new_node = replacements_group['wood'].data[ wood ][ i ];
+		if( v and new_node and minetest.registered_nodes[ v ] and minetest.registered_nodes[ new_node ]) then
+			table.insert( replacements, {v, new_node});
+		end
+	end
+	return replacements;
+end
+
 
 -- returns the new formspec
 citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_update )
+-- TODO: compare with what is stored in the citybuilder.cities data structure
+-- TODO: show name of building, owner, name of town, position of tow, level
+-- TODO: handle digging in a better way
 	if( not( meta ) or not( pos ) or not( player )) then
 		return;
 	end
@@ -282,16 +299,8 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 		-- do nothing here
 	else
 		-- apply wood replacements
-		local replacements = {};
 		local wood = meta:get_string("wood");
-		if( wood and wood ~= "" and replacements_group['wood'].data[ wood ] and wood ~= "default:wood") then
-			for i,v in ipairs( replacements_group['wood'].data[ "default:wood"] ) do
-				local new_node = replacements_group['wood'].data[ wood ][ i ];
-				if( v and new_node and minetest.registered_nodes[ v ] and minetest.registered_nodes[ new_node ]) then
-					table.insert( replacements, {v, new_node});
-				end
-			end
-		end
+		local replacements = citybuilder.get_wood_replacements( wood, {} );
 
 		-- the place_building_from_file function will set these values
 		meta:set_int( "nodes_to_dig", -1 );
@@ -313,11 +322,12 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 	end
 
 	local formspec = "size[9,7]"..
-			"label[0,1.5;Needed for completition (click on \"Update status\" to update):]"..
-			"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";needed;0,2;8,5;]"..
+--			"label[0,1.5;Needed for completition (click on \"Update status\" to update):]"..
+--			"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";needed;0,2;8,5;]"..
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
 			"button_exit[3.0,0.7;2.5,0.5;remove_indicators;Remove scaffolding]"..
 			"button_exit[6.0,0.7;1.2,0.5;preview;Preview]"..
+			"button_exit[0.5,1.5;3.5,0.5;show_needed;Show materials needed]"..
 			"button_exit[7.5,0.7;1,0.5;OK;Exit]";
 	if( error_msg ) then
 		return formspec..
@@ -379,6 +389,7 @@ citybuilder.constructor_on_receive_fields = function(pos, formname, fields, play
 	end
 	local meta = minetest.get_meta( pos );
 
+	-- remove "dig here" indicators and configured scaffolding nodes
 	if( fields.remove_indicators ) then
 		handle_schematics.abort_project_remove_indicators( meta );
 		return;
@@ -386,16 +397,29 @@ citybuilder.constructor_on_receive_fields = function(pos, formname, fields, play
 
 	-- most functions are accessible to all players; only upgrades are limited to the owner
 	local formspec = "";
+
+	-- show preview (2d image) of how the finished building will look like
 	if( fields.preview and not( fields.end_preview )) then
 		if( fields.preview == "Preview" ) then
 			fields.preview = "front";
 		end
+		-- TODO: get this from the data structure
 		local building_name = meta:get_string( 'building_name' );
+		local replacements = citybuilder.get_wood_replacements( meta:get_string( "wood"), {} );
 		formspec = "size[10,10]"..
 			"label[3,1;Preview]"..
 			"button[7,1;2.5,0.5;end_preview;Back to main menu]"..
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
-			build_chest.preview_image_formspec( building_name, {}, fields.preview);
+			build_chest.preview_image_formspec( building_name, replacements, fields.preview);
+
+	-- list which materials are needed
+	elseif( fields.show_needed ) then
+		formspec = "size[9,7]"..
+			"label[0,1.5;Materials needed to complete this project (click on \"Update status\" to update):]"..
+			"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";needed;0,2;8,5;]"..
+			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
+			"button_exit[0.5,0.7;2,0.5;update;Update status]"..
+			"button[7.5,0.7;1,0.5;back;Back]";
 	else
 		formspec = citybuilder.constructor_update( pos, player, meta, fields.upgrade, not(fields.update) );
 	end
