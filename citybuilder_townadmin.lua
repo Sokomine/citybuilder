@@ -145,7 +145,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 		if( not( inv:is_empty("saplings")) or not( inv:is_empty( "printer_input" )) or not( inv:is_empty( "printer_output"))) then
 			formspec = "size[5,2]"..
 				"label[0.5,0;Please remove all saplings and ]"..
-				"label[0.5,0.5;constructors/blueprints first!]"..
+				"label[0.5,0.5;constructors first!]"..
 				"button_exit[2.0,1.3;1.5,0.5;back;Back]";
 		-- forbid abandoning of cities that have assigned buildings
 		elseif( citybuilder.city_get_anz_buildings( city_id )>0) then
@@ -246,14 +246,14 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 				"button[8.0,9.0;1.0,0.5;back;Back]";
 
 
-	-- add new buildings (by "printing" blueprints on citybuilder:blueprint_blank
+	-- add new buildings (by "printing" blueprints on citybuilder:constructor_blank
 	elseif( fields.add_building or fields[ "citybuilder:cityadmin"] or fields.print_building) then
 		if( fields.print_building and fields.selected_blueprint) then
 			local input_stack  = inv:get_stack("printer_input", 1 );
 			local output_stack = inv:get_stack("printer_output", 1 );
-			-- is there a blank blueprint available which we can configure?
-			if( output_stack:is_empty() and inv:contains_item("printer_input", "citybuilder:blueprint_blank")) then
-				-- take one blank blueprint..
+			-- is there a blank constructor available which we can configure?
+			if( output_stack:is_empty() and inv:contains_item("printer_input", "citybuilder:constructor_blank")) then
+				-- take one blank constructor..
 				input_stack:take_item(1);
 				-- ..and add a properly configured one
 				local new_stack = citybuilder.constructor_get_configured_itemstack(
@@ -273,10 +273,10 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 			"button[8.5,0.0;1.0,0.5;back;Back]"..
 				"label[7.8,1.0;Input:]"..
 				"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";printer_input;8.0,1.5;1,1;]"..
-				"item_image[9.0,1.5;1,1;citybuilder:blueprint_blank]"..
+				"item_image[9.0,1.5;1,1;citybuilder:constructor_blank]"..
 				"label[7.8,3.5;Output:]"..
 				"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";printer_output;8.0,4.0;1,1;]"..
-				"item_image[9.0,4.0;1,1;citybuilder:blueprint]"..
+				"item_image[9.0,4.0;1,1;citybuilder:constructor]"..
 			"tablecolumns[" ..
 				"text,align=center;"..   -- description of building
 				"text,align=center]"..   -- what the building provides
@@ -350,7 +350,7 @@ minetest.register_node("citybuilder:cityadmin", {
 		local inv = meta:get_inventory()
 		-- used for determining which wood type the village will use
 		inv:set_size("saplings", 1 * 1)
-		-- used for turning citybuilder:blueprint_blank into configured citybuilder:blueprint
+		-- used for turning citybuilder:constructor_blank into configured citybuilder:constructor
 		inv:set_size("printer_input", 1 * 1)
 		inv:set_size("printer_output", 1 * 1)
         end,
@@ -368,7 +368,7 @@ minetest.register_node("citybuilder:cityadmin", {
 		if( listname=="printer_output") then
 			return 0;
 		end
-		if( listname=="printer_input" and (not( stack ) or stack:get_name()~="citybuilder:blueprint_blank")) then
+		if( listname=="printer_input" and (not( stack ) or stack:get_name()~="citybuilder:constructor_blank")) then
 			return 0;
 		end
                 return stack:get_count()

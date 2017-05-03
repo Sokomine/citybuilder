@@ -1,9 +1,9 @@
 
--- citybuilder:blueprint is used to construct the houses at the location
+-- citybuilder:constructor is used to construct the houses at the location
 -- which the player selected
 
 
--- the citybuilder:blueprint node does hold metadata information;
+-- the citybuilder:constructor node does hold metadata information;
 -- return a new stack with a configured constructor;
 citybuilder.constructor_get_configured_itemstack = function( building_name, owner, city_center_pos, wood, player )
 	-- the building has to be known
@@ -13,8 +13,8 @@ citybuilder.constructor_get_configured_itemstack = function( building_name, owne
 		return;
 	end
 
-	-- configure the new item stack holding a configured blueprint
-	local item_stack = ItemStack("citybuilder:blueprint 1");
+	-- configure the new item stack holding a configured constructor
+	local item_stack = ItemStack("citybuilder:constructor 1");
 	local stack_meta = item_stack:get_meta();
 	local data = stack_meta:to_table().fields;
 
@@ -41,9 +41,9 @@ citybuilder.constructor_get_configured_itemstack = function( building_name, owne
 end
 
 
--- when digging the player gets a citybuilder:blueprint_blank first; but from the
+-- when digging the player gets a citybuilder:constructor_blank first; but from the
 -- oldmetadata we get in after_dig_node all the necessary information can be
--- obtained and the player will get a citybuilder:blueprint that is set to the
+-- obtained and the player will get a citybuilder:constructor that is set to the
 -- correct blueprint and has a nice description for mouseover
 citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
 	-- unregister the building from the city data table
@@ -57,10 +57,10 @@ citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
 		return;
 	end
 
-	-- the digged blank blueprint will be replaced with a properly configured one if possible
+	-- the digged blank constructor will be replaced with a properly configured one if possible
 	local player_inv = player:get_inventory();
-	if( not( player_inv:contains_item("main", "citybuilder:blueprint_blank"))
-	  or not( player_inv:room_for_item( "main", "citybuilder:blueprint" ))) then
+	if( not( player_inv:contains_item("main", "citybuilder:constructor_blank"))
+	  or not( player_inv:room_for_item( "main", "citybuilder:constructor" ))) then
 		return;
 	end
 
@@ -71,8 +71,8 @@ citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
 		return;
 	end
 
-	-- remove the unconfigured blueprint which was the result of the digging action
-	player_inv:remove_item("main", "citybuilder:blueprint_blank 1");
+	-- remove the unconfigured constructor which was the result of the digging action
+	player_inv:remove_item("main", "citybuilder:constructor_blank 1");
 	player_inv:add_item("main", item_stack);
 end
 
@@ -161,7 +161,7 @@ citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, m
 	-- is6d is false (4 values are sufficient)
 	local param2 = core.dir_to_facedir(placer:get_look_dir(), false);
 	-- place the node
-	minetest.set_node( pos, {name="citybuilder:blueprint", param2=param2});
+	minetest.set_node( pos, {name="citybuilder:constructor", param2=param2});
 
 	-- NOTE: We use and set metadata here even though we have not placed the node itshelf yet!
 	local meta = minetest.get_meta( pos );
@@ -228,7 +228,7 @@ citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, m
 	itemstack:take_item(1);
 
 	local formspec = citybuilder.constructor_update( pos, placer, meta, nil, nil );
-	minetest.show_formspec( pname, "citybuilder:blueprint", formspec );
+	minetest.show_formspec( pname, "citybuilder:constructor", formspec );
 
 	return itemstack;
 end
@@ -376,8 +376,8 @@ citybuilder.constructor_on_receive_fields = function(pos, formname, fields, play
 end
 
 
-minetest.register_node("citybuilder:blueprint", {
-	description = "Blueprint for a house",
+minetest.register_node("citybuilder:constructor", {
+	description = "constructor for a house",
 	tiles = {"default_chest_side.png", "default_chest_top.png", "default_chest_side.png", -- TODO: a universal texture would be better
 		"default_chest_side.png", "default_chest_side.png", "default_chest_front.png^beds_bed.png"},
 
@@ -396,8 +396,8 @@ minetest.register_node("citybuilder:blueprint", {
 	legacy_facedir_simple = true,
 	-- constructors are configured; stacking would not be a good idea
 	stack_max = 1,
-	-- when digging, return unconfigured blueprint; but: in after_dig_node it is exchanged for a configured one
-	drop = "citybuilder:blueprint_blank",
+	-- when digging, return unconfigured constructor; but: in after_dig_node it is exchanged for a configured one
+	drop = "citybuilder:constructor_blank",
 
         on_receive_fields = function( pos, formname, fields, player )
            return citybuilder.constructor_on_receive_fields(pos, formname, fields, player);
@@ -465,15 +465,15 @@ minetest.register_node("citybuilder:blueprint", {
 })
 
 
--- helper item; blank blueprint constructors cannot be placed
-minetest.register_craftitem("citybuilder:blueprint_blank", {
-	description = "Blank blueprint constructor",
+-- helper item; blank constructors cannot be placed
+minetest.register_craftitem("citybuilder:constructor_blank", {
+	description = "Blank constructor",
 	inventory_image = "default_paper.png^[transformFX",
         groups = {},
 })
 
 minetest.register_craft({
-	output = "citybuilder:blueprint_blank",
+	output = "citybuilder:constructor_blank",
 	recipe = {
 		{"default:paper", "default:paper", "default:paper"},
 		{"default:paper", "default:paper", "default:paper"},
