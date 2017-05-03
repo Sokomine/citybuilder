@@ -22,7 +22,7 @@ citybuilder.constructor_get_configured_itemstack = function( building_name, owne
 	if( not( owner ) or owner == "" ) then
 		owner = player:get_player_name();
 	end
-	data.building_name   = building_name;
+	data.building_name   = building_data.scm;
 	data.owner           = owner;
 	data.city_center_pos = city_center_pos;
 	data.wood            = wood;
@@ -77,35 +77,71 @@ citybuilder.constructor_digged = function(pos, oldnode, oldmetadata, player)
 end
 
 
--- called in after_place_node
-citybuilder.constructor_placed = function( pos, placer, itemstack )
-	if( not( pos ) or not( placer ) or not( itemstack )) then
-		return false;
+-- helper function for citybuilder.constructor_on_place(..)
+citybuilder.constructor_clear_meta = function( meta )
+	meta:set_string( 'owner',           nil);
+	meta:set_string( 'building_name',   nil);
+	meta:set_string( 'city_center_pos', nil);
+	meta:set_string( 'wood',            nil);
+	meta:set_string( 'start_pos',       nil);
+	meta:set_string( 'end_pos',         nil);
+	meta:set_string( 'rotate',          nil);
+	meta:set_int(    'mirror',          nil);
+	meta:set_string( 'replacements',    nil);
+end
+
+
+-- check if the constructor can be placed here; place it if possible
+citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, mode )
+
+	if( placer == nil or pointed_thing == nil) then
+		return itemstack;
+	end
+	local pname = placer:get_player_name();
+	--minetest.chat_send_player( pname, "You USED this on "..minetest.serialize( pointed_thing )..".");
+
+	if( pointed_thing.type ~= "node" ) then
+		return itemstack; -- no node
+	end
+
+	local pos  = minetest.get_pointed_thing_position( pointed_thing, mode );
+	local node = minetest.env:get_node_or_nil( pos );
+	--minetest.chat_send_player( pname, "  Target node: "..minetest.serialize( node ).." at pos "..minetest.serialize( pos )..".");
+	if( node == nil or pos == nil) then
+		return itemstack; -- node not yet loaded
 	end
 
 	-- get itemstack metadata
 	local item_meta = itemstack:get_meta();
 	local data = item_meta:to_table().fields;
 
-        if( not( data ) or not( data.building_name ) or data.building_name=="" or not( build_chest.building[ data.building_name ])) then
+        if( not( data ) or not( data.building_name ) or data.building_name=="") then
 		citybuilder.show_error_msg( placer,
 			"This building constructor has not been configured yet. "..
 			"Please configure it by using the desk of the city administrator.");
-		return false;
+		return itemstack;
+	end
+	local full_building_name = citybuilder.mts_path..data.building_name;
+	local building_data = build_chest.building[ full_building_name ];
+	if( not( building_data)) then
+		citybuilder.show_error_msg( placer,
+			"The building this constructor has been configured for is no "..
+			"longer available. Old building: \""..tostring( data.building_name ).."\".");
+		return itemstack;
 	end
 
-	if( data.owner ~= placer:get_player_name()) then
+	if( data.owner ~= pname) then
 		citybuilder.show_error_msg( placer,
 			"This building constructor belongs to "..tostring( data.owner )..". "..
 			"You can't use it. Craft your own one!");
-		return false;
+		return itemstack;
 	end
 
 	if( not( data.city_center_pos ) or not( citybuilder.cities[ data.city_center_pos ])) then
 		citybuilder.show_error_msg( placer,
 			"This constructor is configured for a (no longer?) existing city at "..
 			tostring( data.city_center_pos )..". It cannot be used anymore.");
-		return false;
+		return itemstack;
 	end
 	local city_data = citybuilder.cities[ data.city_center_pos ];
 
@@ -118,24 +154,34 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 			"This location is too far away form the city center at "..
 			data.city_center_pos..
 			". Please place this constructor closer to your city administration desk.");
-		return false;
+		return itemstack;
 	end
 
 
+	-- is6d is false (4 values are sufficient)
+	local param2 = core.dir_to_facedir(placer:get_look_dir(), false);
+	-- place the node
+	minetest.set_node( pos, {name="citybuilder:blueprint", param2=param2});
+
+	-- NOTE: We use and set metadata here even though we have not placed the node itshelf yet!
 	local meta = minetest.get_meta( pos );
-	meta:set_string( 'owner',           placer:get_player_name());
-	meta:set_string( 'building_name',   data.building_name );
+	meta:set_string( 'owner',           pname);
+	meta:set_string( 'building_name',   full_building_name );
 	meta:set_string( 'city_center_pos', data.city_center_pos );
 	meta:set_string( 'wood',            data.wood );
 
 	-- this takes param2 of the node at the position pos into account (=rotation
 	-- of the chest/plot marker/...) and sets metadata accordingly: start_pos,
 	-- end_pos, rotate, mirror and replacements
-	local start_pos = build_chest.get_start_pos( pos );
+	local start_pos = build_chest.get_start_pos( pos, full_building_name, param2 );
 	if( not( start_pos ) or not( start_pos.x )) then
+		-- clean up the metadata since we will not place a node there
+		citybuilder.constructor_clear_meta( meta );
+		-- remove the node as well
+		minetest.set_node( pos, {name="air"});
 		citybuilder.show_error_msg( placer,
 			"Error: "..tostring( start_pos ));
-		return false;
+		return itemstack;
 	end
 
 
@@ -162,21 +208,32 @@ citybuilder.constructor_placed = function( pos, placer, itemstack )
 		    or citybuilder.pos_is_inside( {x=v.end_pos.x,   y=v.end_pos.y,   z=v.start_pos.z}, start_pos, end_pos )
 		    or citybuilder.pos_is_inside( {x=v.end_pos.x,   y=v.end_pos.y,   z=v.end_pos.z  }, start_pos, end_pos ))) then
 
+			citybuilder.constructor_clear_meta( meta );
+			minetest.set_node( pos, {name="air"});
 			citybuilder.show_error_msg( placer,
 				"Error: Overlapping with building project at "..minetest.pos_to_string( v.pos ));
-			return false;
+			return itemstack;
 		end
 	end
 
 	-- register the building in the citybuilder.cities data structure
 	citybuilder.city_add_building( data.city_center_pos,
-		{ pos = pos, start_pos = start_pos, end_pos = end_pos, building_name = data.building_name,
-		  rotate = meta:get_string("rotate"), mirror = meta:get_string("mirror") });
+		{ pos = pos, start_pos = start_pos, end_pos = end_pos, building_name = full_building_name,
+		  rotate = meta:get_string("rotate"), mirror = meta:get_string("mirror"), wood = data.wood, param2 = param2 });
+
+	-- prepare inventory space
+	local inv = meta:get_inventory();
+	inv:set_size("needed", 8*5);
+	-- consume the placed constructor
+	itemstack:take_item(1);
 
 	local formspec = citybuilder.constructor_update( pos, placer, meta, nil, nil );
-	minetest.show_formspec( placer:get_player_name(), "citybuilder:constructor", formspec );
-	return true;
+	minetest.show_formspec( pname, "citybuilder:blueprint", formspec );
+
+	return itemstack;
 end
+
+
 
 
 -- returns the new formspec
@@ -342,13 +399,6 @@ minetest.register_node("citybuilder:blueprint", {
 	-- when digging, return unconfigured blueprint; but: in after_dig_node it is exchanged for a configured one
 	drop = "citybuilder:blueprint_blank",
 
-        after_place_node = function(pos, placer, itemstack)
-		-- initialize and update the constructor; if that failes, make it diggable again
-		if( not( citybuilder.constructor_placed( pos, placer, itemstack ))) then
-			local meta = minetest.get_meta( pos );
-			meta:set_int( "citybuilder_level", -1 );
-		end
-        end,
         on_receive_fields = function( pos, formname, fields, player )
            return citybuilder.constructor_on_receive_fields(pos, formname, fields, player);
         end,
@@ -373,6 +423,10 @@ minetest.register_node("citybuilder:blueprint", {
 		end
                 return stack:get_count()
         end,
+
+	on_place = function(itemstack, placer, pointed_thing)
+		return citybuilder.constructor_on_place( itemstack, placer, pointed_thing, "above" );
+	end,
 
         can_dig = function(pos,player)
             local meta          = minetest.get_meta( pos );

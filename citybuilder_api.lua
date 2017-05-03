@@ -9,6 +9,7 @@ citybuilder.city_add_building = function( city_id, data)
 			pos = data.pos,
 			start_pos = data.start_pos,
 			end_pos = data.end_pos,
+			-- store here without path
 			building_name = building_data.scm,
 			rotate = data.rotate,
 			mirror = data.mirror,
