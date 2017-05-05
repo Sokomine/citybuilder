@@ -96,7 +96,7 @@ citybuilder.constructor_set_meta_to_stored_data = function( pos, stored_building
 	local meta = minetest.get_meta( pos );
 	-- set metadata according to what we have stored
 	meta:set_string( 'owner',           citybuilder.cities[ stored_building.city_id ].owner);
-	meta:set_string( 'building_name',   citybuilder.mts_path..stored_building.building_name); -- TODO: with or without mts_path?
+	meta:set_string( 'building_name',   citybuilder.mts_path..stored_building.building_name);
 	meta:set_string( 'city_center_pos', stored_building.city_id );
 	meta:set_string( 'wood',            stored_building.wood );
 	meta:set_string( 'mirror',          stored_building.mirror );
@@ -286,10 +286,10 @@ end
 
 -- returns the new formspec
 citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_update )
--- TODO: handle digging in a better way
 	if( not( meta ) or not( pos ) or not( player )) then
 		return;
 	end
+-- TODO: handle digging in a better way
 	-- refuse update of constructors in ready-to-dig-mode
 	local level = meta:get_int( "citybuilder_level" );
 	if( level < -1 ) then
@@ -364,32 +364,66 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 			"button_exit[4.0,1.2;1,0.5;OK;OK]";
 	end
 
--- TODO: show name of building, owner, name of town, position of town, level
-	-- show main menu
-	local formspec = "size[9,7]"..
---			"label[0,1.5;Needed for completition (click on \"Update status\" to update):]"..
---			"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";needed;0,2;8,5;]"..
+
+
+
+	local building_data = build_chest.building[ building_name ];
+	local city_data = citybuilder.cities[ stored_building.city_id ];
+	-- show main menu; provide some information about this building project
+	local formspec = "size[9,9]"..
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
-			"button_exit[3.0,0.7;2.5,0.5;remove_indicators;Remove scaffolding]"..
-			"button_exit[6.0,0.7;1.2,0.5;preview;Preview]"..
-			"button_exit[0.5,1.5;3.5,0.5;show_needed;Show materials needed]"..
-			"button_exit[7.5,0.7;1,0.5;OK;Exit]";
 
-	local need_to_dig   = meta:get_int( "nodes_to_dig" );
-	local need_to_place = meta:get_int( "nodes_to_place" );
+			"button_exit[6.0,8.0;3,0.5;OK;Exit]"..
 
-	-- if the building is not yet finished
-	if( need_to_dig ~= 0 or need_to_place ~= 0 or not( build_chest.building[ building_name ].citybuilder)) then
-		return formspec..
-			"label[0,0.1;Status: Need to dig "..tostring( need_to_dig ).." and place "..tostring( need_to_place ).." nodes.]"..
-			"button_exit[0.5,0.7;2,0.5;update;Update status]";
+			"label[1.0,1.5;This is a \""..minetest.formspec_escape( building_data.title or building_data.scm ).."\"]"..
+			"label[1.5,2.0;Description: "..minetest.formspec_escape( building_data.descr or " - no description available - ").."]"..
+			"label[1.5,2.5;Provides "..( building_data.provides or " - nothing - ")..
+					minetest.formspec_escape(" [Level "..tostring( building_data.level ).."]").."]"..
+
+			"label[1.0,6.0;Belongs to settlement:]"..
+			"label[1.5,6.5;"..minetest.formspec_escape( city_data.city_name or "-?-").."]"..
+			"label[1.5,7.0;located at "..tostring( stored_building.city_id or "-?-").."]"..
+			"label[1.5,7.5;founded by: "..minetest.formspec_escape( city_data.owner or "-?-").."]";
+
+	local upgrade_possible_to = building_data.upgrade_to;
+	if( upgrade_possible_to ) then
+		local upgrade_data = build_chest.building[ citybuilder.mts_path..upgrade_possible_to ];
+		formspec = formspec..
+			"label[1.5,5.0;\""..minetest.formspec_escape( upgrade_data.title or building_data.scm or "-?-").."\"]"..
+			"label[1.5,5.5;Description: "..minetest.formspec_escape( upgrade_data.descr or " - no description available - ").."]";
+	else
+		formspec = formspec..
+			"label[1.0,6.0;No upgrades available.]";
 	end
 
+	-- store these values in the city data structure
+	stored_building.nodes_to_dig   = meta:get_int( "nodes_to_dig" );
+	stored_building.nodes_to_place = meta:get_int( "nodes_to_place" );
+	-- store the current status
+	citybuilder.save_data();
+
+-- TODO: show requirements, inh(abitants), worker, children, needs_worker, job (those are potential inhabitants)
+-- TODO: show real inhabitants if there are any
+
+	-- if the building is not yet finished
+	if( stored_building.nodes_to_dig ~= 0 or stored_building.nodes_to_place ~= 0 or not( building_data.citybuilder)) then
+		return formspec..
+			"label[1.0,3.0;Status: Number of blocks that need to be..]"..
+			"label[1.5,3.5;..digged: "..stored_building.nodes_to_dig.."]"..
+			"label[1.5,4.0;..placed: "..stored_building.nodes_to_place.."]"..
+			"label[1.0,4.5;Possible future upgrade:]"..
+			"button_exit[6.0,1.5;3,0.5;update;Update status]"..
+			"button_exit[6.0,2.3;3.0,0.5;preview;Preview]"..
+			"button_exit[6.0,3.35;3.0,0.5;remove_indicators;Remove scaffolding]"..
+			"button_exit[6.0,4.15;3.0,0.5;show_needed;Show materials needed]";
+	end
+
+
 	-- set the level of the (completed) building
-	meta:set_int( "citybuilder_level", build_chest.building[ building_name ].level+1 );
+	meta:set_int( "citybuilder_level", building_data.level+1 );
 	meta:set_int( "complete", 1 );
 
-	if( build_chest.building[ building_name ].upgrade_to ) then
+	if( upgrade_possible_to ) then
 
 		-- only the owner/founder can do upgrades
 		if( not( citybuilder.can_access_inventory( pos, player))) then
@@ -397,20 +431,19 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 				"label[0,0.1;Only the founder of this city may upgrade buildings.]";
 		end
 
+		local upgrade_data = build_chest.building[ citybuilder.mts_path..upgrade_possible_to ];
 		-- TODO: check if upgrade is allowed
-		local upgrade_possible_to = build_chest.building[ building_name ].upgrade_to;
 		local descr = upgrade_possible_to;
-		if( upgrade_possible_to
-		  and build_chest.building[ citybuilder.mts_path..upgrade_possible_to ]
-		  and build_chest.building[ citybuilder.mts_path..upgrade_possible_to ].descr ) then
-			descr = build_chest.building[ citybuilder.mts_path..upgrade_possible_to ].descr;
+		if( upgrade_possible_to and upgrade_data and upgrade_data.descr ) then
+			descr = upgrade_data.descr;
 		end
 
 		if( not( do_upgrade )) then
 			return formspec..
-				"label[0,0.1;Info: Upgrade \""..descr.."\" (level "..
-					tostring( build_chest.building[ citybuilder.mts_path..upgrade_possible_to ].level )..") available.]"..
-				"button_exit[0.5,0.7;2,0.5;upgrade;Upgrade now]";
+				"label[1.0,3.0;Status:]"..
+				"label[1.5,3.5;Complete]"..
+				"label[1.0,4.5;Upgrade to level "..tostring( upgrade_data.level ).." available:]"..
+				"button_exit[6.0,4.5;3.0,0.5;upgrade;Upgrade now]";
 		end
 
 		meta:set_string( 'building_name', citybuilder.mts_path..upgrade_possible_to );
