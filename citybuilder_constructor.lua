@@ -91,6 +91,21 @@ citybuilder.constructor_clear_meta = function( meta )
 end
 
 
+-- the metadata might not fit the stored data; set it to the stored data
+citybuilder.constructor_set_meta_to_stored_data = function( pos, stored_building )
+	local meta = minetest.get_meta( pos );
+	-- set metadata according to what we have stored
+	meta:set_string( 'owner',           citybuilder.cities[ stored_building.city_id ].owner);
+	meta:set_string( 'building_name',   citybuilder.mts_path..stored_building.building_name); -- TODO: with or without mts_path?
+	meta:set_string( 'city_center_pos', stored_building.city_id );
+	meta:set_string( 'wood',            stored_building.wood );
+	meta:set_string( 'mirror',          stored_building.mirror );
+	meta:set_string( 'rotate',          stored_building.rotate );
+	meta:set_string( 'start_pos',       minetest.serialize(stored_building.start_pos ));
+	meta:set_string( 'end_pos',         minetest.serialize(stored_building.end_pos ));
+end
+
+
 -- check if the constructor can be placed here; place it if possible
 citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, mode )
 
@@ -146,20 +161,12 @@ citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, m
 
 	-- the data structure might believe that there is a configured constructor here, but it might
 	-- have been removed by other means (WorldEdit etc.) in the meantime
-	local existing_building = citybuilder.city_get_building_at( pos );
-	if( existing_building) then
-		local meta = minetest.get_meta( pos );
-		-- place this node
-		minetest.set_node( pos, {name="citybuilder:constructor", param2=existing_building.param2});
-		-- set metadata according to what we have stored
-		meta:set_string( 'owner',           existing_building.owner);
-		meta:set_string( 'building_name',   citybuilder.mts_path..existing_building.building_name);
-		meta:set_string( 'city_center_pos', existing_building.city_center_pos );
-		meta:set_string( 'wood',            existing_building.wood );
-		meta:set_string( 'mirror',          existing_building.mirror );
-		meta:set_string( 'rotate',          existing_building.rotate );
-		meta:set_string( 'start_pos',       minetest.serialize(existing_building.start_pos ));
-		meta:set_string( 'end_pos',         minetest.serialize(existing_building.end_pos ));
+	local stored_building = citybuilder.city_get_building_at( pos );
+	if( stored_building) then
+		-- place the node with correct param2
+		minetest.set_node( pos, {name="citybuilder:constructor", param2=stored_building.param2});
+		-- set metadata accordingly
+		citybuilder.constructor_set_meta_to_stored_data( pos, stored_building );
 		-- tell the player
 		minetest.chat_send_player( pname, "The constructor here had gone missing. It has been replaced.");
 		-- show the formspec
@@ -279,8 +286,6 @@ end
 
 -- returns the new formspec
 citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_update )
--- TODO: compare with what is stored in the citybuilder.cities data structure
--- TODO: show name of building, owner, name of town, position of tow, level
 -- TODO: handle digging in a better way
 	if( not( meta ) or not( pos ) or not( player )) then
 		return;
@@ -291,7 +296,39 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 		return;
 	end
 
-	local building_name = meta:get_string( 'building_name' );
+	local pname = player:get_player_name();
+
+	-- compare metadata with stored data - they ought to be consistent
+
+	-- get the data from the citybuilder.cities data structure
+	local stored_building = citybuilder.city_get_building_at( pos );
+	local city_center_pos = meta:get_string( 'city_center_pos');
+	-- the data stored in the cities datastructure is considered the valid one because
+	-- that data determines which upgrades are possible
+	if( stored_building ) then
+		-- make sure the metadata is up to date
+		citybuilder.constructor_set_meta_to_stored_data( pos, stored_building );
+
+	-- the building was lost somehow, but the city still exists; read metadata and restore city building data from it
+	elseif( city_center_pos and citybuilder.cities[ city_center_pos ]) then
+		local node = minetest.get_node( pos );
+		citybuilder.city_add_building( city_center_pos, -- this is the city_id
+			{ pos = pos,
+			  building_name = meta:get_string("building_name"),
+			  start_pos = minetest.deserialize( meta:get_string('start_pos')),
+			  end_pos = minetest.deserialize( meta:get_string('end_pos')),
+			  rotate = meta:get_string("rotate"),mirror = meta:get_string("mirror"),
+			  wood = meta:get_string("wood"), param2 = param2 });
+		minetest.chat_send_player( pname, "Adding this building back to the city. It was missing due to an error.");
+	-- if the city is gone, show error message and abort
+	else
+		minetest.chat_send_player( pname, "Error: The city this building belongs to does not exist.");
+		return;
+	end
+
+
+	-- update status (set dig_here indicators, place scaffolding, check how many nodes need to be digged etc.)
+	local building_name = citybuilder.mts_path..stored_building.building_name;
 	local error_msg = nil;
 	if( not( building_name ) or building_name == "" or not( build_chest.building[ building_name ] )) then
 		error_msg = "Unkown building \""..tostring( building_name ).."\".";
@@ -299,8 +336,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 		-- do nothing here
 	else
 		-- apply wood replacements
-		local wood = meta:get_string("wood");
-		local replacements = citybuilder.get_wood_replacements( wood, {} );
+		local replacements = citybuilder.get_wood_replacements( stored_building.wood, {} );
 
 		-- the place_building_from_file function will set these values
 		meta:set_int( "nodes_to_dig", -1 );
@@ -310,17 +346,26 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 		inv:set_size("needed", 8*5);
 		-- actually place dig_here-indicators and special scaffolding
 		error_msg = handle_schematics.place_building_from_file(
-			minetest.deserialize(meta:get_string( "start_pos")),
-			minetest.deserialize(meta:get_string( "end_pos")),
+			stored_building.start_pos, --minetest.deserialize(meta:get_string( "start_pos")),
+			stored_building.end_pos,   --minetest.deserialize(meta:get_string( "end_pos")),
 			building_name,
 			replacements,
-		        meta:get_string("rotate"),
+		        stored_building.rotate, -- meta:get_string("rotate"),
 			build_chest.building[ building_name ].axis,
 			nil, -- no mirror; meta:get_int("mirror"),
 			-- no_plotmarker, keep_ground, scaffolding_only, plotmarker_pos
 			1, false, true, pos );
 	end
 
+	-- show error message if any occoured
+	if( error_msg ) then
+		return "size[9,2]"..
+			"label[0,0.1;Error: "..tostring( error_msg ).."]"..
+			"button_exit[4.0,1.2;1,0.5;OK;OK]";
+	end
+
+-- TODO: show name of building, owner, name of town, position of town, level
+	-- show main menu
 	local formspec = "size[9,7]"..
 --			"label[0,1.5;Needed for completition (click on \"Update status\" to update):]"..
 --			"list[nodemeta:"..pos.x..","..pos.y..","..pos.z..";needed;0,2;8,5;]"..
@@ -329,10 +374,6 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 			"button_exit[6.0,0.7;1.2,0.5;preview;Preview]"..
 			"button_exit[0.5,1.5;3.5,0.5;show_needed;Show materials needed]"..
 			"button_exit[7.5,0.7;1,0.5;OK;Exit]";
-	if( error_msg ) then
-		return formspec..
-			"label[0,0.1;Error: "..tostring( error_msg ).."]";
-	end
 
 	local need_to_dig   = meta:get_int( "nodes_to_dig" );
 	local need_to_place = meta:get_int( "nodes_to_place" );
