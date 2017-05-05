@@ -5,15 +5,10 @@
 citybuilder.city_add_building = function( city_id, data)
 	local building_id = minetest.pos_to_string( data.pos );
 	local building_data = build_chest.building[ data.building_name ];
-	citybuilder.cities[ city_id ].buildings[ building_id ] = {
-			pos = data.pos,
-			start_pos = data.start_pos,
-			end_pos = data.end_pos,
-			-- store here without path
-			building_name = building_data.scm,
-			rotate = data.rotate,
-			mirror = data.mirror,
-			placed = os.time() };
+	-- add some information
+	data.building_name = building_data.scm;
+	data.placed = os.time();
+	citybuilder.cities[ city_id ].buildings[ building_id ] = data;
 	citybuilder.save_data();
 end
 
@@ -46,6 +41,8 @@ citybuilder.city_get_building_at = function( pos )
 	local building_id = minetest.pos_to_string( pos );
 	for city_id,v in pairs( citybuilder.cities ) do
 		if( v.buildings[ building_id ] ) then
+			-- provide a current city_id
+			citybuilder.cities[ city_id ].buildings[ building_id ].city_id = city_id;
 			return citybuilder.cities[ city_id ].buildings[ building_id ];
 		end
 	end
