@@ -380,6 +380,8 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 			"label[1.5,2.5;Provides "..( building_data.provides or " - nothing - ")..
 					minetest.formspec_escape(" [Level "..tostring( building_data.level ).."]").."]"..
 
+			"button_exit[6.0,1.5;3,0.5;update;Update status]"..
+
 			"label[1.0,6.0;Belongs to settlement:]"..
 			"label[1.5,6.5;"..minetest.formspec_escape( city_data.city_name or "-?-").."]"..
 			"label[1.5,7.0;located at "..tostring( stored_building.city_id or "-?-").."]"..
@@ -390,7 +392,8 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 		local upgrade_data = build_chest.building[ citybuilder.mts_path..upgrade_possible_to ];
 		formspec = formspec..
 			"label[1.5,5.0;\""..minetest.formspec_escape( upgrade_data.title or building_data.scm or "-?-").."\"]"..
-			"label[1.5,5.5;Description: "..minetest.formspec_escape( upgrade_data.descr or " - no description available - ").."]";
+			"label[1.5,5.5;Description: "..minetest.formspec_escape( upgrade_data.descr or " - no description available - ").."]"..
+			"button_exit[6.0,4.95;3.0,0.5;show_requirements;Show requirements]";
 	else
 		formspec = formspec..
 			"label[1.0,4.5;No upgrades available.]";
@@ -415,7 +418,6 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 			"label[1.0,3.0;Status: Number of blocks that need to be..]"..
 			"label[1.5,3.5;..digged: "..stored_building.nodes_to_dig.."]"..
 			"label[1.5,4.0;..placed: "..stored_building.nodes_to_place.."]"..
-			"button_exit[6.0,1.5;3,0.5;update;Update status]"..
 			"button_exit[6.0,2.3;3.0,0.5;preview;Preview]"..
 			"button_exit[6.0,3.35;3.0,0.5;remove_indicators;Remove scaffolding]"..
 			"button_exit[6.0,4.15;3.0,0.5;show_needed;Show materials needed]";
@@ -426,29 +428,37 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 	meta:set_int( "citybuilder_level", building_data.level+1 );
 	meta:set_int( "complete", 1 );
 
+	-- the current building is complete
+	formspec = formspec..
+			"label[1.0,3.0;Status:]"..
+			"label[1.5,3.5;Complete]";
+	stored_building.complete = 1;
+	citybuilder.save_data();
+
 	if( upgrade_possible_to ) then
 
 		-- only the owner/founder can do upgrades
 		if( not( citybuilder.can_access_inventory( pos, player))) then
-			stored_building.complete = 0;
 			return formspec..
 				"label[0,0.1;Only the founder of this city may upgrade buildings.]";
 		end
 
 		local upgrade_data = build_chest.building[ citybuilder.mts_path..upgrade_possible_to ];
-		-- TODO: check if upgrade is allowed
 		local descr = upgrade_possible_to;
 		if( upgrade_possible_to and upgrade_data and upgrade_data.descr ) then
 			descr = upgrade_data.descr;
 		end
 
-		if( not( do_upgrade )) then
-			stored_building.complete = 0;
+		-- check if upgrade is allowed
+		if( not( citybuilder.city_can_upgrade_building( pos ))) then
 			return formspec..
-				"label[1.0,3.0;Status:]"..
-				"label[1.5,3.5;Complete]"..
+				"label[1.0,4.5;Next upgrade (to level "..tostring( upgrade_data.level ).."):]";
+		end
+
+		if( not( do_upgrade )) then
+			return formspec..
 				"label[1.0,4.5;Upgrade to level "..tostring( upgrade_data.level ).." available:]"..
-				"button_exit[6.0,4.5;3.0,0.5;upgrade;Upgrade now]";
+				"button_exit[6.0,5.75;3.0,0.5;upgrade;Upgrade now]";
 		end
 
 		meta:set_string( 'building_name', citybuilder.mts_path..upgrade_possible_to );
@@ -487,7 +497,6 @@ citybuilder.constructor_on_receive_fields = function(pos, formname, fields, play
 		if( fields.preview == "Preview" ) then
 			fields.preview = "front";
 		end
-		-- TODO: get this from the data structure
 		local building_name = meta:get_string( 'building_name' );
 		local replacements = citybuilder.get_wood_replacements( meta:get_string( "wood"), {} );
 		formspec = "size[10,10]"..
