@@ -393,25 +393,28 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 			"label[1.5,5.5;Description: "..minetest.formspec_escape( upgrade_data.descr or " - no description available - ").."]";
 	else
 		formspec = formspec..
-			"label[1.0,6.0;No upgrades available.]";
+			"label[1.0,4.5;No upgrades available.]";
 	end
 
 	-- store these values in the city data structure
 	stored_building.nodes_to_dig   = meta:get_int( "nodes_to_dig" );
 	stored_building.nodes_to_place = meta:get_int( "nodes_to_place" );
-	-- store the current status
-	citybuilder.save_data();
 
 -- TODO: show requirements, inh(abitants), worker, children, needs_worker, job (those are potential inhabitants)
 -- TODO: show real inhabitants if there are any
 
 	-- if the building is not yet finished
 	if( stored_building.nodes_to_dig ~= 0 or stored_building.nodes_to_place ~= 0 or not( building_data.citybuilder)) then
+		if( upgrade_possible_to ) then
+			formspec = formspec.."label[1.0,4.5;Possible future upgrade:]";
+		end
+		-- store the current status
+		stored_building.complete = 0;
+		citybuilder.save_data();
 		return formspec..
 			"label[1.0,3.0;Status: Number of blocks that need to be..]"..
 			"label[1.5,3.5;..digged: "..stored_building.nodes_to_dig.."]"..
 			"label[1.5,4.0;..placed: "..stored_building.nodes_to_place.."]"..
-			"label[1.0,4.5;Possible future upgrade:]"..
 			"button_exit[6.0,1.5;3,0.5;update;Update status]"..
 			"button_exit[6.0,2.3;3.0,0.5;preview;Preview]"..
 			"button_exit[6.0,3.35;3.0,0.5;remove_indicators;Remove scaffolding]"..
@@ -427,6 +430,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 
 		-- only the owner/founder can do upgrades
 		if( not( citybuilder.can_access_inventory( pos, player))) then
+			stored_building.complete = 0;
 			return formspec..
 				"label[0,0.1;Only the founder of this city may upgrade buildings.]";
 		end
@@ -439,6 +443,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 		end
 
 		if( not( do_upgrade )) then
+			stored_building.complete = 0;
 			return formspec..
 				"label[1.0,3.0;Status:]"..
 				"label[1.5,3.5;Complete]"..
@@ -447,6 +452,11 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 		end
 
 		meta:set_string( 'building_name', citybuilder.mts_path..upgrade_possible_to );
+		-- store it in the city data structure
+		stored_building.building_name = upgrade_possible_to;
+		stored_building.level =  building_data.level+1;
+		stored_building.complete = 1;
+		citybuilder.save_data();
 		-- call the function recursively once in order to update
 		return citybuilder.constructor_update( pos, player, meta, nil, nil );
 	end
