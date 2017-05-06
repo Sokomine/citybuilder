@@ -476,6 +476,56 @@ end
 
 
 
+-- list requirements of an upgrade
+citybuilder.constructor_show_requirements = function( pos )
+	local formspec = "size[9,7]"..
+		"button[7,0;2,0.5;end_preview;Back]"..
+		"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
+		"label[0,0.0;In order to upgrade to the next level, you will need at]"..
+		"label[0,0.4;least one building at the required level. Requirements:]"..
+		"tablecolumns["..
+                                "text,align=center;"..   -- OK or MISSING
+                                "text,align=left;"..   -- Level X requires
+                                "text,align=center]"..   -- Current Level: Y
+		'table[0.2,1.0;9.0,8.0;form_does_not_exist;';
+
+	-- collect the necessary data
+	local stored_building = citybuilder.city_get_building_at( pos );
+
+	if( not( stored_building )
+	   or not( stored_building.city_id )
+	   or not( citybuilder.cities[ stored_building.city_id ])) then
+		return formspec.."]";
+	end
+
+	-- find out what is required
+	local building_data = build_chest.building[ citybuilder.mts_path..stored_building.building_name ];
+	if( not( building_data ) or not( building_data.upgrade_to )) then
+		return formspec.."]";
+	end
+	local upgrade_data = build_chest.building[ citybuilder.mts_path..building_data.upgrade_to ];
+
+	-- check what the city provides against the requirements
+	local city_data = citybuilder.cities[ stored_building.city_id ];
+	local req_met = citybuilder.city_requirements_met( city_data, "" );
+	for k,v in pairs( upgrade_data.requires ) do
+		if( not( req_met[ k ])) then
+			formspec = formspec.."MISSING";
+		elseif(req_met[ k ]<v ) then
+			formspec = formspec.."NEEDS UPGRADE";
+		else
+			formspec = formspec.."OK";
+		end
+		formspec = formspec..",Level "..tostring(v).." "..tostring(k)..",";
+		if( not(  req_met[ k ])) then
+			formspec = formspec.."- not built yet -,";
+		else
+			formspec = formspec.."Current Level: "..tostring( req_met[k] )..",";
+		end
+	end
+	return formspec.."]";
+end
+
 
 citybuilder.constructor_on_receive_fields = function(pos, formname, fields, player)
 	if( not( pos ) or fields.OK) then
@@ -513,6 +563,9 @@ citybuilder.constructor_on_receive_fields = function(pos, formname, fields, play
 			"field[20,20;0.1,0.1;pos2str;Pos;"..minetest.pos_to_string( pos ).."]"..
 			"button_exit[0.5,0.7;2,0.5;update;Update status]"..
 			"button[7.5,0.7;1,0.5;back;Back]";
+
+	elseif( fields.show_requirements ) then
+		formspec = citybuilder.constructor_show_requirements( pos );
 	else
 		formspec = citybuilder.constructor_update( pos, player, meta, fields.upgrade, not(fields.update) );
 	end

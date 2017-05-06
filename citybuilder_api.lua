@@ -89,10 +89,12 @@ citybuilder.city_requirements_met = function( city_data, except_building_id )
 	-- get the maximum level of whatever the buildings provide
 	for k,v in pairs( city_data.buildings ) do
 		-- one building can be excluded from this comparison
-		if( k ~= except_building_id
-		   and v.provides and v.citybuilder
-		   and (not( req_met[ v.provides ] ) or req_met[ v.provides ]<v.level )) then
-			req_met[ v.provides ] = v.level;
+		if( k ~= except_building_id ) then
+			local building_data = build_chest.building[ citybuilder.mts_path..v.building_name ];
+			if( building_data and building_data.provides and building_data.citybuilder
+			  and (not( req_met[ building_data.provides ] ) or req_met[ building_data.provides ]<building_data.level )) then
+				req_met[ building_data.provides ] = building_data.level;
+			end
 		end
 	end
 	return req_met;
