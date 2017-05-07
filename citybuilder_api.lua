@@ -1,5 +1,98 @@
 
 
+-- check blueprint data and add it to the build_chest.buildings data structure from handle_schematics;
+-- includes some checks regarding up/downgrade and required fields
+citybuilder.add_blueprint = function( data, path )
+	-- this is a building that belongs to the citybuilder mod
+	data.citybuilder = 1;
+	-- required fields
+	if(  not( data.scm )
+	  or not( data.provides)
+	  or not( data.level)
+	  or not( data.title )
+	  or not( data.descr )) then
+		print("[citybuilder] Error: Not adding "..minetest.serialize( data ).." due to missing fields (scm, provides, level, title and/or descr).");
+		return;
+	end
+
+	-- necessary in order to determine the full filename (without extension)
+	if( not(path )) then
+		data.path = citybuilder.mts_path;
+	else
+		data.path = path;
+	end
+
+	local downgrade_building = nil;
+	-- find out if any other building can be upgraded to this one and set downgrade_to
+	for k,v in pairs( build_chest.building ) do
+		if( v and v.scm and v.citybuilder and v.upgrade_to == data.scm ) then
+			data.downgrade_to = v.scm;
+			downgrade_building = v;
+			if( v.provides ~= data.provides ) then
+				print("[citybuilder] Error: " ..tostring( data.scm ).." provides something else than "..tostring( v.data.scm ).." from which it can be upgraded.");
+				return;
+			if( v.level+1 ~= data.level ) then
+				print("[citybuilder] Error: " ..tostring( data.scm ).." has not level+1 of "..tostring( v.data.scm ).." from which it can be upgraded.");
+				return;
+			end
+		end
+	end
+
+	local upgrade_building = nil;
+	-- make sure that the level of the building we upgrade to also fits
+	if( data.upgrade_to ) then
+		upgrade_building = build_chest.building[ data.path .. data.upgrade_to ];
+		if( upgrade_building and upgrade_building.level-1 ~= data.level) then
+			print("[citybuilder] Error: " ..tostring( data.scm ).." has not level-1 of "..tostring( upgrade_building.scm ).." to which it can be upgraded.");
+			return;
+		end
+	end
+
+	-- the upgrade building has to provide the same
+	if( upgrade_building
+	  and upgrade_building.provides ~= this_building.provides ) then
+		print("[citybuilder] Error: " ..tostring( data.scm ).." provides something else than "..tostring( v.data.scm ).." to which it can be upgraded.");
+		return;
+	end
+
+	-- register the building so that handle_schematics can analyze the blueprint and keep it ready
+	build_chest.add_building(  data.path..data.scm, data );
+	-- create preview images, statistics etc
+	build_chest.read_building( data.path..data.scm, data );
+
+	local this_building = build_chest.building[ data.path .. data.scm ];
+	-- check size
+	if( downgrade_building and downgrade_building.size
+	  and( (downgrade_building.size.x ~= this_building.size.x)
+	    or (downgrade_building.size.y ~= this_building.size.y)
+	    or (downgrade_building.size.z ~= this_building.size.z))) then
+		print("[citybuilder] Error: " ..tostring( data.scm ).." and "..tostring( downgrade_building.scm ).." (from which it is upgraded) are not the same size.");
+		-- citybuilder will not cover this building
+		this_building.citybuilder = nil;
+		return;
+	end
+	if( upgrade_building   and upgrade_building.size
+	  and( (upgrade_building.size.x ~= this_building.size.x)
+	    or (upgrade_building.size.y ~= this_building.size.y)
+	    or (upgrade_building.size.z ~= this_building.size.z))) then
+		print("[citybuilder] Error: " ..tostring( data.scm ).." and "..tostring( upgrade_building.scm ).." (to which this one could be upgraded) are not the same size.");
+		-- citybuilder will not cover this building
+		this_building.citybuilder = nil;
+		return;
+	end
+
+	-- add the building to the build chest
+	build_chest.add_entry( {'main','mods', 'citybuilder', data.provides, data.scm, data.path..data.scm});
+	-- there has to be a first building in each series which does not require any predecessors;
+	-- it will be offered as something the player can build
+	-- (upgrades are then available at the particular building)
+	if( not( data.requires ) and data.level==0) then
+		table.insert( citybuilder.starter_buildings, data.scm );
+	end
+end
+
+
+
 -- register the building in the citybuilder.cities data structure;
 -- there can only be one building at a given position
 citybuilder.city_add_building = function( city_id, data)
