@@ -289,7 +289,6 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 	if( not( meta ) or not( pos ) or not( player )) then
 		return;
 	end
--- TODO: handle digging in a better way
 	-- refuse update of constructors in ready-to-dig-mode
 	local level = meta:get_int( "citybuilder_level" );
 	if( level < -1 ) then
@@ -406,9 +405,9 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 				formspec = formspec..
 					"button_exit[6.0,6.55;3.0,0.5;downgrade;Downgrade]";
 			end
-		else
-			formspec = formspec..
-					"button_exit[6.0,6.55;3.0,0.5;downgrade;Abandon building]";
+--		else
+--			formspec = formspec..
+--					"button_exit[6.0,6.55;3.0,0.5;downgrade;Abandon building]";
 		end
 	end
 
@@ -419,6 +418,8 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 -- TODO: show inh(abitants), worker, children, needs_worker, job (those are potential inhabitants)
 -- TODO: show real inhabitants if there are any
 
+	-- set the level of the building (+1, so that we do not start from 0)
+	meta:set_int( "citybuilder_level", building_data.level+1 );
 
 	-- when failing to do a downgrade, information about possible updates will not be shown
 	if( do_downgrade ) then
@@ -484,8 +485,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 			return formspec;
 		end
 	else
-		-- set the level of the (completed) building
-		meta:set_int( "citybuilder_level", building_data.level+1 );
+		-- the building has been completed
 		meta:set_int( "complete", 1 );
 
 		-- the current building is complete
@@ -704,12 +704,14 @@ minetest.register_node("citybuilder:constructor", {
 			return false;
 		end
 
-		local level = meta:get_int( "citybuilder_level" );
-		if( level and level > 0 ) then
+		-- only allow aborting a project if level 0 has not been completed yet
+		local stored_building = citybuilder.city_get_building_at( pos );
+		if( stored_building
+		   and ((stored_building.level and stored_building.level>0 )
+		     or (stored_building.complete and stored_building.complete>0))) then
 			minetest.chat_send_player(name, "This building constructor has spawned a building and cannot be digged.");
 			return false;
 		end
-		-- TODO: only allow aborting a project if level 0 has not been completed yet
 		handle_schematics.abort_project_remove_indicators( meta );
 		return true;
         end,
