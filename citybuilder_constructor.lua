@@ -403,7 +403,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, no_upd
 	stored_building.nodes_to_dig   = meta:get_int( "nodes_to_dig" );
 	stored_building.nodes_to_place = meta:get_int( "nodes_to_place" );
 
--- TODO: show requirements, inh(abitants), worker, children, needs_worker, job (those are potential inhabitants)
+-- TODO: show inh(abitants), worker, children, needs_worker, job (those are potential inhabitants)
 -- TODO: show real inhabitants if there are any
 
 	-- if the building is not yet finished

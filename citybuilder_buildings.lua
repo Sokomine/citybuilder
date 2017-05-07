@@ -1,3 +1,33 @@
+--[[
+	{ -- example entry:
+		-- the filename of the schematic
+		scm="npc_house_level_3_1_180",
+		-- title, description and level will be used instead of the filename in order to describe the building for the player
+		title="Small house",
+		descr="Founding a family",
+		-- filename of what this building can be upgraded to; note: that schematic ought to have the same dimensions
+		upgrade_to="npc_house_level_4_1_180",
+		-- what this building provides (=single string)
+		provides="housing",
+		-- ..and the level at which it is provided
+		level=3,
+		-- each building may require what other buildings provide at a certain level; in order to be allowed to build this
+		-- particular building, you need one building that provides "lumberjack" at level 1 (or higher), another one that
+		-- provides "pub" at level 1 (or higher), another one which provides "mine" at level 1, a "church" at at least
+		-- level 2, and so on
+		requires={ lumberjack = 1, pub = 1, mine = 1, church = 2, farm = 0, mill = 0},
+		-- this house holds beds for 3 inhabitants and can house that many npc (not used yet)
+		inh=3,
+		-- 2 of the npc living in this house can work elsewhere (not used yet)
+		worker=2,
+		-- 1 of them is a child (not used yet)
+		children=1,
+		-- how many npc need to work here in order for the building to function? (not used yet)
+		needs_worker=1,
+		-- which job does the building provide? (not used yet)
+		job="houseowner"
+	},
+--]]
 
 citybuilder.buildings = {
 	-- very tiny wooden cabin
