@@ -5,16 +5,23 @@
 		-- title, description and level will be used instead of the filename in order to describe the building for the player
 		title="Small house",
 		descr="Founding a family",
-		-- filename of what this building can be upgraded to; note: that schematic ought to have the same dimensions
+		-- filename of what this building can be upgraded to;
+		-- the upgrade building ought to have...
+		-- ...the same dimensions
+		-- ...provide exactly the same as this building (see provide-entry)
+		-- ...have a level of exactly 1 higher (the first building starts at level 0)
+		-- Note: There is no check if these conditions are met.
 		upgrade_to="npc_house_level_4_1_180",
 		-- what this building provides (=single string)
 		provides="housing",
-		-- ..and the level at which it is provided
+		-- ..and the level at which it is provided (note: start at level 0);
+		-- buildings at level 0 can be placed and built directly; all others need to be achieved through upgrading
 		level=3,
 		-- each building may require what other buildings provide at a certain level; in order to be allowed to build this
 		-- particular building, you need one building that provides "lumberjack" at level 1 (or higher), another one that
 		-- provides "pub" at level 1 (or higher), another one which provides "mine" at level 1, a "church" at at least
-		-- level 2, and so on
+		-- level 2, and so on;
+		-- buildings at level 0 are not allowed to have any requirements (Note: this is not checked)
 		requires={ lumberjack = 1, pub = 1, mine = 1, church = 2, farm = 0, mill = 0},
 		-- this house holds beds for 3 inhabitants and can house that many npc (not used yet)
 		inh=3,
