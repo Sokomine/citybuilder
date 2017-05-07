@@ -125,6 +125,75 @@ citybuilder.city_requirements_missing = function( city_data, requirements, excep
 end
 
 
+-- from which building has this one been upgraded?
+-- returns nil if nothing found
+citybuilder.city_get_downgrade = function( pos )
+	local stored_building = citybuilder.city_get_building_at( pos );
+	-- is there a building at that position?
+	if( not( stored_building )) then
+		return;
+	end
+	-- return the first suitable building found
+	for k,v in pairs( build_chest.building ) do
+		if( v and v.upgrade_to and v.upgrade_to == stored_building.building_name ) then
+			return k;
+		end
+	end
+end
+
+
+-- is a downgrade possible without violating requirements?
+citybuilder.city_can_downgrade_building = function( pos )
+	local stored_building = citybuilder.city_get_building_at( pos );
+	-- is there a building at that position?
+	if( not( stored_building ) or not( stored_building.city_id) or not( citybuilder.cities[ stored_building.city_id ])) then
+		return false;
+	end
+	-- get information about the building type
+	local building_data = build_chest.building[ citybuilder.mts_path..stored_building.building_name ];
+	if( not(building_data) or not(building_data.provides)) then
+		return false;
+	end
+	-- check if what this building provides is needed in the city at this level
+	local building_id = minetest.pos_to_string( pos );
+	local city_data = citybuilder.cities[ stored_building.city_id ];
+	local min_req = -1;
+	local min_provided = -1;
+	for k,v in pairs( city_data.buildings ) do
+		if( k ~= building_id ) then
+			local b = build_chest.building[ citybuilder.mts_path..v.building_name ];
+			-- if there is another building which provides the same at this or a higher level we are done
+			if( b and b.provides and b.provides == building_data.provides ) then
+				if(b.level >= building_data.level ) then
+					-- all ok; that building here provides the same at the same or higher level
+					return true;
+				elseif( b.level >= min_provided ) then
+					min_provided = b.level;
+				end
+			end
+			if( b.requires ) then
+				for typ, level in pairs( b.requires ) do
+					if( typ==building_data.provides ) then
+						if( level > min_req) then
+							min_req = level;
+						end
+					end
+				end
+			end
+		end
+	end
+	-- another building provides it at a sufficiently high level
+	if( min_provided >= min_req ) then
+		return true;
+	end
+	-- the new buidling will provide the same at one level less
+	if( min_req <= building_data.level - 1 ) then
+		return true;
+	end
+	return false;
+end
+
+
 -- helper function; returns true if pos is located inside the volume spanned by p1 and p2
 citybuilder.pos_is_inside = function( pos, p1, p2 )
 	return (pos.x >= math.min(p1.x,p2.x) and pos.x <= math.max(p1.x,p2.x)
