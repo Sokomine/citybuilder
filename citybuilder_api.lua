@@ -31,6 +31,7 @@ citybuilder.add_blueprint = function( data, path )
 			if( v.provides ~= data.provides ) then
 				print("[citybuilder] Error: " ..tostring( data.scm ).." provides something else than "..tostring( v.data.scm ).." from which it can be upgraded.");
 				return;
+			end
 			if( v.level+1 ~= data.level ) then
 				print("[citybuilder] Error: " ..tostring( data.scm ).." has not level+1 of "..tostring( v.data.scm ).." from which it can be upgraded.");
 				return;
@@ -46,6 +47,10 @@ citybuilder.add_blueprint = function( data, path )
 			print("[citybuilder] Error: " ..tostring( data.scm ).." has not level-1 of "..tostring( upgrade_building.scm ).." to which it can be upgraded.");
 			return;
 		end
+	end
+
+	if( upgrade_building ) then
+		upgrade_building.downgrade_to = data.scm;
 	end
 
 	-- the upgrade building has to provide the same
@@ -219,19 +224,15 @@ end
 
 
 -- from which building has this one been upgraded?
--- returns nil if nothing found
-citybuilder.city_get_downgrade = function( pos )
+-- returns nil if nothing found; returns building data on success
+citybuilder.city_get_downgrade_data = function( pos )
 	local stored_building = citybuilder.city_get_building_at( pos );
+	local building_data = build_chest.building[ citybuilder.mts_path..stored_building.building_name ];
 	-- is there a building at that position?
-	if( not( stored_building )) then
+	if( not( building_data ) or not( building_data.downgrade_to)) then
 		return;
 	end
-	-- return the first suitable building found
-	for k,v in pairs( build_chest.building ) do
-		if( v and v.upgrade_to and v.upgrade_to == stored_building.building_name ) then
-			return k;
-		end
-	end
+	return build_chest.building[ citybuilder.mts_path..building_data.downgrade_to ];
 end
 
 
