@@ -2,16 +2,21 @@
 
 -- check blueprint data and add it to the build_chest.buildings data structure from handle_schematics;
 -- includes some checks regarding up/downgrade and required fields
-citybuilder.add_blueprint = function( data, path )
-	-- this is a building that belongs to the citybuilder mod
-	data.citybuilder = 1;
+citybuilder.add_blueprint = function( path, data, modname )
 	-- required fields
-	if(  not( data.scm )
+	if(  not( data )
+	  or not( data.scm )
 	  or not( data.provides)
 	  or not( data.level)
 	  or not( data.title )
 	  or not( data.descr )) then
 		print("[citybuilder] Error: Not adding "..minetest.serialize( data ).." due to missing fields (scm, provides, level, title and/or descr).");
+		return;
+	end
+
+	-- there can only be one file per filename...even if it is using a diffrent path
+	if( citybuilder.full_filename[ data.scm ]) then
+		print("[citybuilder] Error: "..tostring( data.scm ).." - duplicate filename.");
 		return;
 	end
 
@@ -42,7 +47,7 @@ citybuilder.add_blueprint = function( data, path )
 	local upgrade_building = nil;
 	-- make sure that the level of the building we upgrade to also fits
 	if( data.upgrade_to ) then
-		upgrade_building = build_chest.building[ data.path .. data.upgrade_to ];
+		upgrade_building = citybuilder.city_get_building_data( data.upgrade_to );
 		if( upgrade_building and upgrade_building.level-1 ~= data.level) then
 			print("[citybuilder] Error: " ..tostring( data.scm ).." has not level-1 of "..tostring( upgrade_building.scm ).." to which it can be upgraded.");
 			return;
@@ -55,7 +60,7 @@ citybuilder.add_blueprint = function( data, path )
 
 	-- the upgrade building has to provide the same
 	if( upgrade_building
-	  and upgrade_building.provides ~= this_building.provides ) then
+	  and upgrade_building.provides ~= data.provides ) then
 		print("[citybuilder] Error: " ..tostring( data.scm ).." provides something else than "..tostring( v.data.scm ).." to which it can be upgraded.");
 		return;
 	end
@@ -65,49 +70,68 @@ citybuilder.add_blueprint = function( data, path )
 	-- create preview images, statistics etc
 	build_chest.read_building( data.path..data.scm, data );
 
-	local this_building = build_chest.building[ data.path .. data.scm ];
 	-- check size
 	if( downgrade_building and downgrade_building.size
-	  and( (downgrade_building.size.x ~= this_building.size.x)
-	    or (downgrade_building.size.y ~= this_building.size.y)
-	    or (downgrade_building.size.z ~= this_building.size.z))) then
+	  and( (downgrade_building.size.x ~= data.size.x)
+	    or (downgrade_building.size.y ~= data.size.y)
+	    or (downgrade_building.size.z ~= data.size.z))) then
 		print("[citybuilder] Error: " ..tostring( data.scm ).." and "..tostring( downgrade_building.scm ).." (from which it is upgraded) are not the same size.");
 		-- citybuilder will not cover this building
-		this_building.citybuilder = nil;
+		data.citybuilder = nil;
 		return;
 	end
 	if( upgrade_building   and upgrade_building.size
-	  and( (upgrade_building.size.x ~= this_building.size.x)
-	    or (upgrade_building.size.y ~= this_building.size.y)
-	    or (upgrade_building.size.z ~= this_building.size.z))) then
+	  and( (upgrade_building.size.x ~= data.size.x)
+	    or (upgrade_building.size.y ~= data.size.y)
+	    or (upgrade_building.size.z ~= data.size.z))) then
 		print("[citybuilder] Error: " ..tostring( data.scm ).." and "..tostring( upgrade_building.scm ).." (to which this one could be upgraded) are not the same size.");
 		-- citybuilder will not cover this building
-		this_building.citybuilder = nil;
+		data.citybuilder = nil;
 		return;
 	end
 
 	-- add the building to the build chest
-	build_chest.add_entry( {'main','mods', 'citybuilder', data.provides, data.scm, data.path..data.scm});
+	if( not( modname ) or modname == "" ) then
+		modname = "citybuilder";
+	end
+	build_chest.add_entry( {'main','mods', modname, data.provides, data.scm, data.path..data.scm});
 	-- there has to be a first building in each series which does not require any predecessors;
 	-- it will be offered as something the player can build
 	-- (upgrades are then available at the particular building)
 	if( not( data.requires ) and data.level==0) then
 		table.insert( citybuilder.starter_buildings, data.scm );
 	end
+
+	-- downgrade_to, upgrade_to and building_name are filenames without the path
+	citybuilder.full_filename[ data.scm ] = data.path..data.scm;
+
+	-- this is a building that belongs to the citybuilder mod
+	data.citybuilder = 1;
 end
 
+
+citybuilder.city_get_building_data = function( filename )
+	if( not( filename ) or not( citybuilder.full_filename )) then
+		return;
+	end
+	return build_chest.building[ citybuilder.full_filename[ filename ]];
+end
 
 
 -- register the building in the citybuilder.cities data structure;
 -- there can only be one building at a given position
 citybuilder.city_add_building = function( city_id, data)
 	local building_id = minetest.pos_to_string( data.pos );
-	local building_data = build_chest.building[ data.building_name ];
+	local building_data = citybuilder.city_get_building_data( data.building_name );
 	-- add some information
+	if( not( building_data )) then
+		return false;
+	end
 	data.building_name = building_data.scm;
 	data.placed = os.time();
 	citybuilder.cities[ city_id ].buildings[ building_id ] = data;
 	citybuilder.save_data();
+	return true;
 end
 
 
@@ -157,12 +181,12 @@ citybuilder.city_can_upgrade_building = function( pos )
 		return;
 	end
 	-- is an upgrade defined?
-	local building_data = build_chest.building[ citybuilder.mts_path..stored_building.building_name ];
+	local building_data = citybuilder.city_get_building_data( stored_building.building_name );
 	if( not(building_data) or not(building_data.upgrade_to)) then
 		return;
 	end
 	-- get the data about the new building
-	local upgrade_data = build_chest.building[ citybuilder.mts_path..building_data.upgrade_to ];
+	local upgrade_data = citybuilder.city_get_building_data( building_data.upgrade_to );
 	-- get the city data
 	local city_data = citybuilder.cities[ stored_building.city_id ];
 	-- city and upgrade building both need to exist
@@ -188,7 +212,7 @@ citybuilder.city_requirements_met = function( city_data, except_building_id )
 	for k,v in pairs( city_data.buildings ) do
 		-- one building can be excluded from this comparison
 		if( k ~= except_building_id ) then
-			local building_data = build_chest.building[ citybuilder.mts_path..v.building_name ];
+			local building_data = citybuilder.city_get_building_data( v.building_name );
 			if( building_data and building_data.provides and building_data.citybuilder
 			  and (not( req_met[ building_data.provides ] ) or req_met[ building_data.provides ]<building_data.level )) then
 				req_met[ building_data.provides ] = building_data.level;
@@ -227,12 +251,12 @@ end
 -- returns nil if nothing found; returns building data on success
 citybuilder.city_get_downgrade_data = function( pos )
 	local stored_building = citybuilder.city_get_building_at( pos );
-	local building_data = build_chest.building[ citybuilder.mts_path..stored_building.building_name ];
+	local building_data = citybuilder.city_get_building_data( stored_building.building_name );
 	-- is there a building at that position?
 	if( not( building_data ) or not( building_data.downgrade_to)) then
 		return;
 	end
-	return build_chest.building[ citybuilder.mts_path..building_data.downgrade_to ];
+	return citybuilder.city_get_building_data( building_data.downgrade_to );
 end
 
 
@@ -244,7 +268,7 @@ citybuilder.city_can_downgrade_building = function( pos )
 		return false;
 	end
 	-- get information about the building type
-	local building_data = build_chest.building[ citybuilder.mts_path..stored_building.building_name ];
+	local building_data = citybuilder.city_get_building_data( stored_building.building_name );
 	if( not(building_data) or not(building_data.provides)) then
 		return false;
 	end
@@ -255,7 +279,7 @@ citybuilder.city_can_downgrade_building = function( pos )
 	local min_provided = -1;
 	for k,v in pairs( city_data.buildings ) do
 		if( k ~= building_id ) then
-			local b = build_chest.building[ citybuilder.mts_path..v.building_name ];
+			local b = citybuilder.city_get_building_data( v.building_name );
 			-- if there is another building which provides the same at this or a higher level we are done
 			if( b and b.provides and b.provides == building_data.provides ) then
 				if(b.level >= building_data.level ) then

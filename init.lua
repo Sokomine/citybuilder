@@ -7,11 +7,11 @@ citybuilder.modpath = minetest.get_modpath( minetest.get_current_modname());
 -- folder where the buildings can be found
 citybuilder.mts_path = citybuilder.modpath..'/schems/';
 
+-- stores the filename including path for all files registered with citybuilder
+citybuilder.full_filename = {};
+
 -- configure some parameters
 dofile(citybuilder.modpath.."/config.lua")
-
--- load information about available buildings
-dofile(citybuilder.modpath.."/citybuilder_buildings.lua")
 
 -- some common functions for acessing and manipulating cities
 dofile(citybuilder.modpath.."/citybuilder_api.lua")
@@ -26,17 +26,9 @@ dofile(citybuilder.modpath.."/citybuilder_constructor.lua")
 dofile(citybuilder.modpath.."/citybuilder_townadmin.lua")
 
 
-
 -- only level 0 buildings are available at the beginning; all other buildings
 -- can only be obtained through upgrades of said level 0 buildings
 citybuilder.starter_buildings = {};
-
-for i,v in ipairs( citybuilder.buildings ) do
-	citybuilder.add_blueprint( v, citybuilder.mts_path );
-end
-
--- print("[citybuilder] Available starter buildings: "..minetest.serialize( citybuilder.starter_buildings ));
-
 
 -- this table will contain information about all existing cities
 citybuilder.cities = {};

@@ -232,7 +232,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
                         'table[0.2,0.8;9.0,8.0;form_does_not_exist;';
 
 		for k,v in pairs(city_data.buildings) do
-			local building_data = build_chest.building[ citybuilder.mts_path..v.building_name ];
+			local building_data = citybuilder.city_get_building_data( v.building_name );
 			if( building_data ) then
 				formspec = formspec..
 					minetest.formspec_escape(building_data.title or building_data.scm or tostring(i))..","..
@@ -257,7 +257,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 				input_stack:take_item(1);
 				-- ..and add a properly configured one
 				local new_stack = citybuilder.constructor_get_configured_itemstack(
-					citybuilder.mts_path..citybuilder.starter_buildings[ tonumber(fields.selected_blueprint) ],
+					citybuilder.full_filename[ citybuilder.starter_buildings[ tonumber(fields.selected_blueprint) ]],
 					city_data.owner, city_id, city_data.wood, player );
 				-- put the configured constructor in the output field
 				output_stack:add_item( new_stack );
@@ -284,7 +284,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 
 		for i,v in ipairs( citybuilder.starter_buildings ) do
-			local building_data = build_chest.building[ citybuilder.mts_path..v ];
+			local building_data = citybuilder.city_get_building_data( v );
 			formspec = formspec..
 					(building_data.title or building_data.scm or tostring(i))..","..
 					minetest.formspec_escape("["..(building_data.provides or "- unknown -").."]")..",";
@@ -292,7 +292,7 @@ citybuilder.cityadmin_on_receive_fields = function( pos, formname, fields, playe
 
 		local clicked = minetest.explode_table_event( fields[ "citybuilder:cityadmin"] );
 		if( clicked and clicked.row and clicked.row > 0 and citybuilder.starter_buildings[ clicked.row ]) then
-			local building_data = build_chest.building[ citybuilder.mts_path..citybuilder.starter_buildings[ clicked.row ] ];
+			local building_data = citybuilder.city_get_building_data( citybuilder.starter_buildings[ clicked.row ]);
 			formspec = formspec..';'..tostring(clicked.row)..']'..
 				"field[20,21;0.1,0.1;selected_blueprint;selected_blueprint_row;"..tostring(clicked.row).."]"..
 				"button[7.0,2.8;3.0,0.5;print_building;Print selected blueprint]"..

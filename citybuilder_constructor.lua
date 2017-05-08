@@ -95,7 +95,7 @@ citybuilder.constructor_set_meta_to_stored_data = function( pos, stored_building
 	local meta = minetest.get_meta( pos );
 	-- set metadata according to what we have stored
 	meta:set_string( 'owner',           citybuilder.cities[ stored_building.city_id ].owner);
-	meta:set_string( 'building_name',   citybuilder.mts_path..stored_building.building_name);
+	meta:set_string( 'building_name',   citybuilder.full_filename[ stored_building.building_name ]);
 	meta:set_string( 'city_center_pos', stored_building.city_id );
 	meta:set_string( 'wood',            stored_building.wood );
 	meta:set_string( 'mirror',          stored_building.mirror );
@@ -135,8 +135,8 @@ citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, m
 			"Please configure it by using the desk of the city administrator.");
 		return itemstack;
 	end
-	local full_building_name = citybuilder.mts_path..data.building_name;
-	local building_data = build_chest.building[ full_building_name ];
+	local full_building_name = citybuilder.full_filename[ data.building_name ];
+	local building_data = citybuilder.city_get_building_data( data.building_name );
 	if( not( building_data)) then
 		citybuilder.show_error_msg( placer,
 			"The building this constructor has been configured for is no "..
@@ -251,7 +251,7 @@ citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, m
 
 	-- register the building in the citybuilder.cities data structure
 	citybuilder.city_add_building( data.city_center_pos,
-		{ pos = pos, start_pos = start_pos, end_pos = end_pos, building_name = full_building_name,
+		{ pos = pos, start_pos = start_pos, end_pos = end_pos, building_name = building_data.scm,
 		  rotate = meta:get_string("rotate"), mirror = meta:get_string("mirror"), wood = data.wood, param2 = param2 });
 
 	-- prepare inventory space
@@ -318,17 +318,21 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 			  rotate = meta:get_string("rotate"),mirror = meta:get_string("mirror"),
 			  wood = meta:get_string("wood"), param2 = param2 });
 		minetest.chat_send_player( pname, "Adding this building back to the city. It was missing due to an error.");
+		stored_building = citybuilder.city_get_building_at( pos );
 	-- if the city is gone, show error message and abort
 	else
 		minetest.chat_send_player( pname, "Error: The city this building belongs to does not exist.");
+		-- make it diggable again
+		meta:set_int( "citybuilder_level", -1 );
 		return;
 	end
 
 
 	-- update status (set dig_here indicators, place scaffolding, check how many nodes need to be digged etc.)
-	local building_name = citybuilder.mts_path..stored_building.building_name;
+	local building_name = citybuilder.full_filename[ stored_building.building_name ];
+	local building_data = citybuilder.city_get_building_data( stored_building.building_name );
 	local error_msg = nil;
-	if( not( building_name ) or building_name == "" or not( build_chest.building[ building_name ] )) then
+	if( not( building_name ) or building_name == "" or not( building_data )) then
 		error_msg = "Unkown building \""..tostring( building_name ).."\".";
 	elseif( no_update ) then
 		-- do nothing here
@@ -349,7 +353,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 			building_name,
 			replacements,
 		        stored_building.rotate, -- meta:get_string("rotate"),
-			build_chest.building[ building_name ].axis,
+			building_data.axis,
 			nil, -- no mirror; meta:get_int("mirror"),
 			-- no_plotmarker, keep_ground, scaffolding_only, plotmarker_pos
 			1, false, true, pos );
@@ -365,7 +369,6 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 
 
 
-	local building_data = build_chest.building[ building_name ];
 	local city_data = citybuilder.cities[ stored_building.city_id ];
 	-- show main menu; provide some information about this building project
 	local formspec = "size[9,9]"..
@@ -387,7 +390,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 
 	local upgrade_possible_to = building_data.upgrade_to;
 	if( upgrade_possible_to ) then
-		local upgrade_data = build_chest.building[ citybuilder.mts_path..upgrade_possible_to ];
+		local upgrade_data = citybuilder.city_get_building_data( upgrade_possible_to );
 		formspec = formspec..
 			"label[1.0,4.5;Next upgrade (to level "..tostring( upgrade_data.level ).."):]"..
 			"label[1.5,5.0;\""..minetest.formspec_escape( upgrade_data.title or building_data.scm or "-?-").."\"]"..
@@ -440,7 +443,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 				"label[0,0.1;Error: Building for downgrade not found.]";
 
 		elseif( building_data.level>0 ) then
-			meta:set_string( 'building_name', citybuilder.mts_path .. downgrade_building.scm );
+			meta:set_string( 'building_name', citybuilder.full_filename[ downgrade_building.scm ]);
 			-- store it in the city data structure
 			stored_building.building_name = downgrade_building.scm;
 			stored_building.level = downgrade_building.level;
@@ -493,7 +496,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 	-- handle upgrade
 	if( upgrade_possible_to ) then
 
-		local upgrade_data = build_chest.building[ citybuilder.mts_path..upgrade_possible_to ];
+		local upgrade_data = citybuilder.city_get_building_data( upgrade_possible_to );
 		local descr = upgrade_possible_to;
 		if( upgrade_possible_to and upgrade_data and upgrade_data.descr ) then
 			descr = upgrade_data.descr;
@@ -516,7 +519,7 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 				"label[0,0.1;Only the founder of this city may upgrade buildings.]";
 		end
 
-		meta:set_string( 'building_name', citybuilder.mts_path..upgrade_possible_to );
+		meta:set_string( 'building_name', citybuilder.full_filename[ upgrade_possible_to ]);
 		-- store it in the city data structure
 		stored_building.building_name = upgrade_possible_to;
 		stored_building.level =  building_data.level+1;
@@ -555,11 +558,11 @@ citybuilder.constructor_show_requirements = function( pos )
 	end
 
 	-- find out what is required
-	local building_data = build_chest.building[ citybuilder.mts_path..stored_building.building_name ];
+	local building_data = citybuilder.city_get_building_data( stored_building.building_name );
 	if( not( building_data ) or not( building_data.upgrade_to )) then
 		return formspec.."]";
 	end
-	local upgrade_data = build_chest.building[ citybuilder.mts_path..building_data.upgrade_to ];
+	local upgrade_data = citybuilder.city_get_building_data( building_data.upgrade_to );
 
 	-- check what the city provides against the requirements
 	local city_data = citybuilder.cities[ stored_building.city_id ];
