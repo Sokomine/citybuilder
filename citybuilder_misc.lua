@@ -2,7 +2,7 @@
 
 -- only the owner can use the inventory
 citybuilder.can_access_inventory = function( pos, player )
-	if( not( pos ) or not( player )) then
+	if( not( pos ) or not( player ) or not( player:is_player())) then
 		return false;
 	end
 	local meta = minetest.get_meta( pos );

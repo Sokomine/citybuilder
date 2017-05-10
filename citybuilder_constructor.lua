@@ -167,7 +167,7 @@ citybuilder.constructor_on_place = function( itemstack, placer, pointed_thing, m
 		-- set metadata accordingly
 		citybuilder.constructor_set_meta_to_stored_data( pos, stored_building );
 		-- tell the player
-		minetest.chat_send_player( pname, "The constructor here had gone missing. It has been replaced.");
+		citybuilder.show_error_msg( placer, "The constructor here had gone missing. It has been replaced.");
 		-- show the formspec
 		local formspec = citybuilder.constructor_update( pos, placer, meta, nil, nil, nil );
 		minetest.show_formspec( pname, "citybuilder:constructor", formspec );
@@ -294,8 +294,6 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 		return;
 	end
 
-	local pname = player:get_player_name();
-
 	-- compare metadata with stored data - they ought to be consistent
 
 	-- get the data from the citybuilder.cities data structure
@@ -317,11 +315,11 @@ citybuilder.constructor_update = function( pos, player, meta, do_upgrade, do_dow
 			  end_pos = minetest.deserialize( meta:get_string('end_pos')),
 			  rotate = meta:get_string("rotate"),mirror = meta:get_string("mirror"),
 			  wood = meta:get_string("wood"), param2 = param2 });
-		minetest.chat_send_player( pname, "Adding this building back to the city. It was missing due to an error.");
+		citybuilder.show_error_msg( player, "Adding this building back to the city. It was missing due to an error.");
 		stored_building = citybuilder.city_get_building_at( pos );
 	-- if the city is gone, show error message and abort
 	else
-		minetest.chat_send_player( pname, "Error: The city this building belongs to does not exist.");
+		citybuilder.show_error_msg( player, "Error: The city this building belongs to does not exist.");
 		-- make it diggable again
 		meta:set_int( "citybuilder_level", -1 );
 		return;

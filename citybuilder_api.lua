@@ -319,3 +319,15 @@ citybuilder.pos_is_inside = function( pos, p1, p2 )
 	    and pos.z >= math.min(p1.z,p2.z) and pos.z <= math.max(p1.z,p2.z));
 end
 
+
+-- interface for mobs to perform updates; players ought to use the formspecs provided (players
+-- will want to read the formspec returned, but mobs can't read and can ignore it)
+citybuilder.update_building_at = function( pos, clicker )
+	-- the update function will return a formspec
+	local formspec = citybuilder.constructor_update( pos, clicker, minetest.get_meta( pos ), nil, nil, nil );
+	if( formspec and formspec ~= "" ) then
+		return true;
+	else
+		return false;
+	end
+end
